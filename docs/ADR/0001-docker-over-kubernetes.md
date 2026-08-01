@@ -1,4 +1,6 @@
-# ADR 0001 — Docker em vez de Kubernetes
+# ADR 0001 — Docker over Kubernetes
+
+> **Language:** English · [Português (Brasil)](../pt-br/ADR/0001-docker-over-kubernetes.md)
 
 - **Status:** Accepted
 - **Date:** 2025-01-15
@@ -8,64 +10,64 @@
 
 ## Context
 
-A Licitera precisava de um modelo de deploy em produção para poucos serviços de longa duração (API, workers), além de serviços de dados gerenciados. O tamanho do time e o perfil de tráfego ainda não justificavam um control plane completo de Kubernetes. Ao mesmo tempo, precisávamos de builds reproduzíveis, restart baseado em health check e escala horizontal sem drama.
+Licitech needed a production deploy model for a small number of long-running services (API, workers), plus managed data services. Team size and traffic profile did not yet justify a full Kubernetes control plane. At the same time, we needed reproducible builds, health-check-based restarts, and horizontal scale without drama.
 
-Restrições:
+Constraints:
 
-- Preferir simplicidade operacional a elasticidade teórica máxima
-- Manter uma saída limpa se a orquestração precisar crescer
-- Não acoplar a lógica de negócio à API de um orquestrador específico
+- Prefer operational simplicity over maximum theoretical elasticity
+- Keep a clean exit path if orchestration needs to grow
+- Do not couple business logic to a specific orchestrator API
 
 ---
 
 ## Decision
 
-Empacotar todos os workloads de compute como **imagens Docker** e rodá-los com orquestração **compatível com Compose no Dokploy** (ou PaaS equivalente centrado em Docker). Adiar Kubernetes até critérios de saída explícitos serem atingidos.
+Package all compute workloads as **Docker images** and run them with **Compose-compatible orchestration on Dokploy** (or an equivalent Docker-centric PaaS). Defer Kubernetes until explicit exit criteria are met.
 
 ---
 
 ## Alternatives Considered
 
-| Alternativa | Por que não (agora) |
+| Alternative | Why not (now) |
 |---|---|
-| **Managed Kubernetes (EKS/GKE/AKS)** | Custo do control plane + carga cognitiva desproporcionais à quantidade de serviços |
-| **Nomad** | Ecossistema menor para o skill set do time |
-| **Só containers serverless** | Encaixa mal em workers de longa duração, orientados a fila, com poll loop constante |
-| **VM bare + systemd** | Pouca reproduzibilidade; risco de drift de configuração |
+| **Managed Kubernetes (EKS/GKE/AKS)** | Control-plane cost + cognitive load disproportionate to the number of services |
+| **Nomad** | Smaller ecosystem for the team's skill set |
+| **Serverless containers only** | Poor fit for long-running, queue-oriented workers with a constant poll loop |
+| **Bare VM + systemd** | Little reproducibility; configuration drift risk |
 
 ---
 
 ## Trade-offs
 
-| Benefício | Custo |
+| Benefit | Cost |
 |---|---|
-| Caminho rápido até produção | Autoscaling mais manual / simples no início |
-| Paridade fácil com o ambiente local (`compose`) | Ecossistema de service mesh / policies menos rico |
-| Imagens portáveis | O time ainda precisa endurecer hosts e redes |
-| Pouca sobrecarga de ops | Scheduling multi-região vira trabalho caseiro |
+| Fast path to production | More manual / simple autoscaling early on |
+| Easy parity with local (`compose`) | Less rich service-mesh / policy ecosystem |
+| Portable images | The team still needs to harden hosts and networks |
+| Low ops overhead | Multi-region scheduling becomes DIY work |
 
 ---
 
 ## Consequences
 
-**Positivo**
+**Positive**
 
-- Engenheiros raciocinam em imagens e health checks — skill que transfere para K8s depois
-- Deploys continuam pinados por digest e guiados por CI
-- Domínios de falha mapeiam bem para containers
+- Engineers reason in images and health checks — a skill that transfers to K8s later
+- Deploys stay digest-pinned and CI-driven
+- Failure domains map cleanly to containers
 
-**Negativo / Follow-ups**
+**Negative / Follow-ups**
 
-- Documentar critérios de saída (veja abaixo)
-- Investir em documentação de Compose/rede e hardening de host
-- Revisar este ADR quando profundidade de fila ou contagem de serviços forçarem comportamento tipo HPA no dia a dia
+- Document exit criteria (see below)
+- Invest in Compose/network documentation and host hardening
+- Revisit this ADR when queue depth or service count force HPA-like behavior day to day
 
-**Critérios de saída rumo ao Kubernetes**
+**Exit criteria toward Kubernetes**
 
-1. Necessidade sustentada de policies de autoscaling multi-serviço
-2. Scheduling multi-host além do conforto do PaaS atual
-3. Requisitos de compliance / network policy que o modelo atual não cobre
-4. Custo operacional de *não* ter K8s supera o custo de rodá-lo
+1. Sustained need for multi-service autoscaling policies
+2. Multi-host scheduling beyond the comfort of the current PaaS
+3. Compliance / network-policy requirements the current model does not cover
+4. Operational cost of *not* having K8s exceeds the cost of running it
 
 ---
 

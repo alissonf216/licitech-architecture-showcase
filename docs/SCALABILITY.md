@@ -1,21 +1,21 @@
-# Escalabilidade
+# Scalability
 
-> Escala horizontal primeiro. Kubernetes, mesh e companhia só entram quando as métricas operacionais pedirem.
+> Horizontal scale first. Kubernetes, mesh, and company only enter when operational metrics demand them.
 
 ---
 
-## 1. Escala horizontal
+## 1. Horizontal scale
 
 ```mermaid
 flowchart TB
-    subgraph Edge["Escala com o provedor"]
+    subgraph Edge["Scales with the provider"]
         FE[Vercel Edge Network]
     end
-    subgraph Compute["Escala por contagem de réplicas"]
-        API[Réplicas da API]
-        W[Réplicas de Workers]
+    subgraph Compute["Scales by replica count"]
+        API[API Replicas]
+        W[Worker Replicas]
     end
-    subgraph Data["Escala por plano / padrão"]
+    subgraph Data["Scales by plan / pattern"]
         PG[(PostgreSQL)]
         REDIS[(Redis)]
     end
@@ -27,45 +27,45 @@ flowchart TB
     W --> PG
 ```
 
-| Camada | Unidade de escala | Constraint |
+| Layer | Scale unit | Constraint |
 |---|---|---|
-| Frontend | Regiões de edge / ISR / CDN | Limites da plataforma |
-| API | Réplicas de container | Orçamento do pool de DB |
-| Workers | Réplicas de container | Throughput da queue / rate limits upstream |
-| Postgres | Vertical + read replicas (depois) | Connection & IOPS |
-| Redis | Vertical / clustered (depois) | Memória & modo de persistência |
+| Frontend | Edge regions / ISR / CDN | Platform limits |
+| API | Container replicas | DB pool budget |
+| Workers | Container replicas | Queue throughput / upstream rate limits |
+| Postgres | Vertical + read replicas (later) | Connection & IOPS |
+| Redis | Vertical / clustered (later) | Memory & persistence mode |
 
 ---
 
-## 2. Serviços stateless
+## 2. Stateless services
 
-API e workers **não guardam estado local durável**. Scale out não exige session affinity.
+API and workers **do not hold durable local state**. Scale-out does not require session affinity.
 
-Implicações:
+Implications:
 
-- Qualquer réplica atende qualquer request
-- Rolling deploys ficam simples
-- Recovery de crash = restart + reconsume
+- Any replica serves any request
+- Rolling deploys stay simple
+- Crash recovery = restart + reconsume
 
 ---
 
-## 3. Pools de workers
+## 3. Worker pools
 
-| Pool | Tipo de trabalho | Sinal de escala |
+| Pool | Work type | Scale signal |
 |---|---|---|
-| Ingestão | Fetch & normalize | Profundidade da queue / janelas de fonte |
-| Enrichment | Enrichment CPU / IO | Idade do job |
-| Notification | Fan-out de mensagens | Profundidade da queue |
+| Ingestion | Fetch & normalize | Queue depth / source windows |
+| Enrichment | CPU / IO enrichment | Job age |
+| Notification | Message fan-out | Queue depth |
 
-Pools podem ser deploys separados compartilhando a mesma imagem com command/env diferentes — isola workloads barulhentos.
+Pools can be separate deploys sharing the same image with different command/env — isolates noisy workloads.
 
 ---
 
 ## 4. Autoscaling
 
-**Hoje:** ajustes manuais / agendados de réplicas via UI de orquestração.
+**Today:** manual / scheduled replica adjustments via the orchestration UI.
 
-**Sinais-alvo:**
+**Target signals:**
 
 ```mermaid
 flowchart LR
@@ -76,64 +76,64 @@ flowchart LR
     DEC -->|down| REM[Remove replicas]
 ```
 
-Guards: períodos de cooldown, caps máximos de réplica (custo + pool de DB), mínimas de réplica para HA.
+Guards: cooldown periods, max replica caps (cost + DB pool), min replicas for HA.
 
 ---
 
-## 5. Estratégia de cache
+## 5. Cache strategy
 
-| Camada | O quê | TTL / invalidação |
+| Layer | What | TTL / invalidation |
 |---|---|---|
-| CDN / Edge | Assets estáticos, páginas cacheáveis | Plataforma + cache headers |
-| Application | Read models quentes | TTL curto + bust explícito no write |
-| Redis | Rate limits, computações efêmeras | TTL da key |
-| Database | Materialized views (seletivo) | Jobs de refresh |
+| CDN / Edge | Static assets, cacheable pages | Platform + cache headers |
+| Application | Hot read models | Short TTL + explicit bust on write |
+| Redis | Rate limits, ephemeral computations | Key TTL |
+| Database | Materialized views (selective) | Refresh jobs |
 
 > [!WARNING]
-> Cacheie só payloads **seguros por tenant**. Nunca sirva respostas em cache cross-tenant.
+> Cache only **tenant-safe** payloads. Never serve cross-tenant cached responses.
 
 ---
 
 ## 6. Connection pooling
 
-- Limite o pool no lado da app para que `replicas × pool ≤ DB max_connections` (com folga)
-- Prefira um pooler (ex.: pooler gerenciado / estilo PgBouncer) para muitas queries curtas
-- Workers usam orçamentos de pool separados da API
+- Cap the app-side pool so `replicas × pool ≤ DB max_connections` (with headroom)
+- Prefer a pooler (e.g. managed pooler / PgBouncer-style) for many short queries
+- Workers use pool budgets separate from the API
 
 ---
 
-## 7. Processamento de queue em escala
+## 7. Queue processing at scale
 
-- Particione o trabalho por chave de entidade quando a ordem importa
-- Faça batch quando for seguro para reduzir round-trips ao DB
-- Aplique limites de educação da fonte independentes da concorrência do consumer
-- Monitoramento de dead-letter evita backlog apodrecendo em silêncio
+- Partition work by entity key when order matters
+- Batch when safe to reduce DB round-trips
+- Apply source politeness limits independent of consumer concurrency
+- Dead-letter monitoring prevents backlog rotting in silence
 
 ---
 
-## 8. Gargalos de database
+## 8. Database bottlenecks
 
-| Sintoma | Causa típica | Mitigação |
+| Symptom | Typical cause | Mitigation |
 |---|---|---|
-| p95 de query subindo | Indexes faltando / seq scans | Explain plans; index; reescrever |
-| Espera no pool | Réplicas demais / pools grandes | Pooler; reduzir pool; scale de reads |
-| Lock contention | Updates em hot rows | Shard keys; serialização via queue |
-| Crescimento de storage | Histórico sem limite | Jobs de retenção; cold storage |
+| Rising query p95 | Missing indexes / seq scans | Explain plans; index; rewrite |
+| Pool wait | Too many replicas / large pools | Pooler; shrink pool; scale reads |
+| Lock contention | Hot-row updates | Shard keys; serialize via queue |
+| Storage growth | Unbounded history | Retention jobs; cold storage |
 
 ---
 
-## 9. Migração futura para Kubernetes
+## 9. Future migration to Kubernetes
 
-Kubernetes é um destino **possível** — não o default.
+Kubernetes is a **possible** destination — not the default.
 
-| Fique em Docker + Dokploy quando… | Considere K8s quando… |
+| Stay on Docker + Dokploy when… | Consider K8s when… |
 |---|---|
-| Contagem de réplicas continua modesta | Muitos serviços precisam de HPA declarativo |
-| Compute single-region basta | Scheduling multi-região é necessário |
-| Time de ops pequeno | Precisa de mesh / policy engines padronizados |
-| Dor de deploy é baixa | Topologia de deploy passa do conforto do Compose |
+| Replica count stays modest | Many services need declarative HPA |
+| Single-region compute is enough | Multi-region scheduling is required |
+| Ops team is small | Need standardized mesh / policy engines |
+| Deploy pain is low | Deploy topology outgrows Compose comfort |
 
-Critérios de saída e trade-offs: [ADR 0001](ADR/0001-docker-over-kubernetes.md).
+Exit criteria and trade-offs: [ADR 0001](ADR/0001-docker-over-kubernetes.md).
 
 ```mermaid
 flowchart TD
@@ -148,7 +148,7 @@ flowchart TD
 
 ---
 
-## Documentos relacionados
+## Related documents
 
 - [ARCHITECTURE.md](ARCHITECTURE.md)
 - [PERFORMANCE.md](PERFORMANCE.md)

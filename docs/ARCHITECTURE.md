@@ -1,59 +1,61 @@
-# Arquitetura
+# Architecture
 
-> Documentação de arquitetura sanitizada: sem schemas proprietários, endpoints reais ou detalhes de implementação.
+> **Language:** English · [Português (Brasil)](pt-br/ARCHITECTURE.md)
+
+> Sanitized architecture documentation: no proprietary schemas, real endpoints, or implementation details.
 
 ---
 
-## 1. Contexto do sistema
+## 1. System context
 
-A Licitera é um SaaS multi-tenant que agrega e organiza **sinais de compras públicas** (editais, avisos, referências legislativas) e os disponibiliza em fluxos web autenticados.
+Licitech is a multi-tenant SaaS that aggregates and organizes **public procurement signals** (notices, announcements, legislative references) and surfaces them through authenticated web flows.
 
 ```mermaid
 C4Context
-    title Contexto do Sistema — Licitera
+    title System Context — Licitech
 
-    Person(user, "Analista de Compras", "Acompanha editais e fluxos")
-    Person(admin, "Admin do Tenant", "Gerencia usuários e preferências")
+    Person(user, "Procurement Analyst", "Tracks notices and workflows")
+    Person(admin, "Tenant Admin", "Manages users and preferences")
 
-    System(licitera, "Plataforma Licitera", "SaaS de inteligência em compras públicas")
+    System(licitech, "Licitech Platform", "Public procurement intelligence SaaS")
 
-    System_Ext(sources, "Fontes de Dados Públicas", "Portais governamentais e APIs de dados abertos")
-    System_Ext(email, "Provedor de Notificações", "E-mail transacional / webhooks")
-    System_Ext(idp, "Identidade (Supabase Auth)", "Provedor de autenticação")
+    System_Ext(sources, "Public Data Sources", "Government portals and open-data APIs")
+    System_Ext(email, "Notification Provider", "Transactional email / webhooks")
+    System_Ext(idp, "Identity (Supabase Auth)", "Authentication provider")
 
-    Rel(user, licitera, "Usa", "HTTPS")
-    Rel(admin, licitera, "Administra", "HTTPS")
-    Rel(licitera, sources, "Ingere (com rate limit)", "HTTPS")
-    Rel(licitera, email, "Envia notificações", "HTTPS")
-    Rel(licitera, idp, "Valida sessões", "HTTPS")
+    Rel(user, licitech, "Uses", "HTTPS")
+    Rel(admin, licitech, "Administers", "HTTPS")
+    Rel(licitech, sources, "Ingests (rate-limited)", "HTTPS")
+    Rel(licitech, email, "Sends notifications", "HTTPS")
+    Rel(licitech, idp, "Validates sessions", "HTTPS")
 ```
 
 > [!NOTE]
-> Adaptadores de fontes externas são tratados como **I/O não confiável**. Todo conteúdo ingerido é validado, normalizado e armazenado sob políticas por tenant antes de chegar ao usuário.
+> External source adapters are treated as **untrusted I/O**. All ingested content is validated, normalized, and stored under per-tenant policies before it reaches the user.
 
 ---
 
-## 2. Fronteiras de serviço
+## 2. Service boundaries
 
-| Fronteira | Responsabilidade | Isolamento de falha |
+| Boundary | Responsibility | Failure isolation |
 |---|---|---|
-| **Edge UI** | Renderização, roteamento no client, gates de auth no edge | UI degradada sem travar workers |
-| **API** | Commands/queries síncronos, authZ | Reinicia independente dos workers |
-| **Workers** | Ingestão, enriquecimento, notificações | Crash loops não derrubam a API |
-| **Queue** | Buffer e semântica de retry | Back-pressure protege as fontes upstream |
-| **Data plane** | Estado durável, RLS, storage | PITR / backups independentes do compute |
+| **Edge UI** | Rendering, client routing, edge auth gates | Degraded UI without stalling workers |
+| **API** | Synchronous commands/queries, authZ | Restarts independently of workers |
+| **Workers** | Ingestion, enrichment, notifications | Crash loops do not take down the API |
+| **Queue** | Buffer and retry semantics | Back-pressure protects upstream sources |
+| **Data plane** | Durable state, RLS, storage | PITR / backups independent of compute |
 
 ```mermaid
 graph TB
-    subgraph Edge["Fronteira Edge"]
+    subgraph Edge["Edge Boundary"]
         FE[Frontend]
     end
-    subgraph App["Fronteira de Aplicação"]
+    subgraph App["Application Boundary"]
         API[API]
         W[Workers]
         Q[Queue]
     end
-    subgraph Data["Fronteira de Dados"]
+    subgraph Data["Data Boundary"]
         DB[(PostgreSQL)]
         OBJ[Object Storage]
     end
@@ -68,25 +70,25 @@ graph TB
 
 ---
 
-## 3. Componentes do backend
+## 3. Backend components
 
-| Componente | Papel | Estado |
+| Component | Role | State |
 |---|---|---|
-| **Processo da API** | Superfície REST/JSON (ou RPC); validação; orquestração | Stateless |
-| **Auth middleware** | Verificação de JWT, extração de claims, vínculo ao tenant | Stateless |
-| **Domain services** | Orquestração de casos de uso (sem SQL direto nos controllers) | Stateless |
-| **Camada de repositório** | Abstração de persistência | Stateless |
-| **Worker runners** | Consomem jobs; handlers idempotentes | Stateless |
-| **Scheduler / poller** | Enfileira janelas periódicas de ingestão | Stateless |
+| **API process** | REST/JSON (or RPC) surface; validation; orchestration | Stateless |
+| **Auth middleware** | JWT verification, claim extraction, tenant binding | Stateless |
+| **Domain services** | Use-case orchestration (no direct SQL in controllers) | Stateless |
+| **Repository layer** | Persistence abstraction | Stateless |
+| **Worker runners** | Consume jobs; idempotent handlers | Stateless |
+| **Scheduler / poller** | Enqueues periodic ingestion windows | Stateless |
 
 > [!TIP]
-> Controllers ficam magros. Regras de domínio ficam nos services. Persistência é trocável atrás dos repositórios — assim Supabase/Postgres fica como detalhe de implementação do data plane.
+> Controllers stay thin. Domain rules live in services. Persistence is swappable behind repositories — so Supabase/Postgres remains a data-plane implementation detail.
 
 ---
 
-## 4. Arquitetura de workers
+## 4. Worker architecture
 
-Workers são **processos com escala horizontal** consumindo de uma queue compartilhada.
+Workers are **horizontally scalable processes** consuming from a shared queue.
 
 ```mermaid
 flowchart TD
@@ -101,43 +103,43 @@ flowchart TD
 
     H1 --> DB[(PostgreSQL)]
     H2 --> DB
-    H3 --> EXT[Provedor de Notificações]
+    H3 --> EXT[Notification Provider]
 
     H1 -->|retry / DLQ| Q
     H2 -->|retry / DLQ| Q
 ```
 
-**Regras de design**
+**Design rules**
 
-1. **Idempotency keys** em todo job — a gente assume entrega at-least-once
-2. **Retries limitados** com exponential backoff + jitter
-3. Caminho de **dead-letter** para poison messages depois do máximo de tentativas
-4. **Visibility timeout** para workers que crasham não deixarem jobs órfãos
-5. **Sem memória mutável compartilhada** entre workers
+1. **Idempotency keys** on every job — we assume at-least-once delivery
+2. **Bounded retries** with exponential backoff + jitter
+3. **Dead-letter** path for poison messages after max attempts
+4. **Visibility timeout** so crashed workers do not leave orphaned jobs
+5. **No shared mutable memory** across workers
 
 ---
 
-## 5. Fluxo de dados
+## 5. Data flow
 
 ```mermaid
 flowchart LR
-    SRC[Fontes Públicas] -->|pull| ING[Worker de Ingestão]
-    ING -->|normaliza / valida| NORM[Registros Normalizados]
+    SRC[Public Sources] -->|pull| ING[Ingestion Worker]
+    ING -->|normalize / validate| NORM[Normalized Records]
     NORM -->|upsert| DB[(PostgreSQL)]
     DB -->|read| API[API]
-    API -->|JWT + RLS| TENANT[Resultados por Tenant]
+    API -->|JWT + RLS| TENANT[Per-Tenant Results]
     TENANT --> UI[Frontend]
 ```
 
-**Princípios**
+**Principles**
 
-- O caminho de escrita é orientado a append/upsert; atualizações são auditáveis quando necessário
-- O caminho de leitura é filtrado por RLS no banco — filtros na aplicação são a segunda linha, não a única
-- Payloads grandes (anexos, snapshots brutos) vão para object storage; o DB guarda referências e metadados
+- The write path is append/upsert-oriented; updates are auditable when needed
+- The read path is filtered by RLS in the database — application filters are the second line, not the only one
+- Large payloads (attachments, raw snapshots) go to object storage; the DB holds references and metadata
 
 ---
 
-## 6. Fluxo de eventos
+## 6. Event flow
 
 ```mermaid
 sequenceDiagram
@@ -151,7 +153,7 @@ sequenceDiagram
     Q->>W: deliver(job)
     W->>W: fetch + validate
     W->>DB: upsert records
-    alt Regras de matching do usuário batem
+    alt User matching rules hit
         W->>Q: enqueue(notify)
         Q->>N: deliver(notify_job)
         N->>N: send channel message
@@ -159,123 +161,123 @@ sequenceDiagram
     W-->>Q: ACK
 ```
 
-Eventos são **commands numa queue**, não um event bus completo — escolhido pela simplicidade operacional na escala atual. Veja o [roadmap de ADRs](../ROADMAP.md) para quando faria sentido reconsiderar um backbone de eventos mais rico.
+Events are **commands on a queue**, not a full event bus — chosen for operational simplicity at the current scale. See the [ADR roadmap](../ROADMAP.md) for when a richer event backbone would be worth reconsidering.
 
 ---
 
-## 7. Processamento da queue
+## 7. Queue processing
 
-| Preocupação | Abordagem |
+| Concern | Approach |
 |---|---|
-| Entrega | At-least-once |
-| Ordenação | Por partição / por chave de entidade quando necessário; senão best-effort |
-| Back-pressure | Métricas de profundidade da queue → escala workers / descarta jobs não críticos |
-| Poison messages | Máximo de retries → dead-letter + alerta |
-| Observabilidade | Correlation de job ID nos logs: API → queue → worker |
+| Delivery | At-least-once |
+| Ordering | Per partition / per entity key when required; otherwise best-effort |
+| Back-pressure | Queue-depth metrics → scale workers / drop non-critical jobs |
+| Poison messages | Max retries → dead-letter + alert |
+| Observability | Job ID correlation in logs: API → queue → worker |
 
 ---
 
-## 8. Design stateless
+## 8. Stateless design
 
-Todos os processos de aplicação são **stateless**:
+All application processes are **stateless**:
 
-- Sem session store em processo
-- Sem sticky sessions no load balancer
-- Configuração via environment (injetada em runtime)
-- Escala horizontal = número de réplicas
+- No in-process session store
+- No sticky sessions at the load balancer
+- Configuration via environment (injected at runtime)
+- Horizontal scale = replica count
 
-Estado durável:
+Durable state:
 
-| Store | Conteúdo |
+| Store | Contents |
 |---|---|
-| PostgreSQL | Entidades canônicas, tenancy, atributos de authz |
-| Redis | Queue / cache de curta duração / contadores de rate limit |
-| Object storage | Blobs e artefatos brutos |
+| PostgreSQL | Canonical entities, tenancy, authz attributes |
+| Redis | Queue / short-lived cache / rate-limit counters |
+| Object storage | Blobs and raw artifacts |
 
 ---
 
-## 9. Isolamento de falhas
+## 9. Failure isolation
 
 ```mermaid
 graph TD
-    subgraph FD1["Domínio de Falha: Edge"]
-        V[Deploy Vercel]
+    subgraph FD1["Failure Domain: Edge"]
+        V[Vercel Deploy]
     end
-    subgraph FD2["Domínio de Falha: API"]
-        A1[Réplica API 1]
-        A2[Réplica API 2]
+    subgraph FD2["Failure Domain: API"]
+        A1[API Replica 1]
+        A2[API Replica 2]
     end
-    subgraph FD3["Domínio de Falha: Workers"]
-        W1[Pool de Workers]
+    subgraph FD3["Failure Domain: Workers"]
+        W1[Worker Pool]
     end
-    subgraph FD4["Domínio de Falha: Dados"]
+    subgraph FD4["Failure Domain: Data"]
         PG[(PostgreSQL)]
         R[(Redis)]
     end
 
-    V -.->|independente| FD2
-    FD2 -.->|independente| FD3
+    V -.->|independent| FD2
+    FD2 -.->|independent| FD3
     FD2 --> FD4
     FD3 --> FD4
 ```
 
-| Falha | Raio de impacto | Mitigação |
+| Failure | Blast radius | Mitigation |
 |---|---|---|
-| Crash de um container da API | Requests em voo naquela réplica | Restart policy + multi-réplica |
-| Saturação do pool de workers | Jobs assíncronos atrasados | Scale out; descarta trabalho de baixa prioridade |
-| Redis indisponível | Queue pausa | Alertas; modo degradado (só caminhos sync críticos, se definidos) |
-| Postgres indisponível | Outage total de leitura/escrita | Fail closed; restore de backup / PITR |
+| Single API container crash | In-flight requests on that replica | Restart policy + multi-replica |
+| Worker pool saturation | Delayed async jobs | Scale out; drop low-priority work |
+| Redis unavailable | Queue pauses | Alerts; degraded mode (sync-critical paths only, if defined) |
+| Postgres unavailable | Full read/write outage | Fail closed; backup restore / PITR |
 
 ---
 
 ## 10. Rate limiting
 
-| Camada | Mecanismo | Propósito |
+| Layer | Mechanism | Purpose |
 |---|---|---|
-| Edge | Regras da plataforma / WAF | Abuso volumétrico |
-| API | Orçamentos por token / IP / tenant | Uso justo e controle de custo |
-| Workers | Limites de educação por fonte | Proteger APIs públicas upstream |
-| Database | Caps de pool | Evitar connection storms |
+| Edge | Platform rules / WAF | Volumetric abuse |
+| API | Per-token / IP / tenant budgets | Fair use and cost control |
+| Workers | Per-source politeness limits | Protect upstream public APIs |
+| Database | Pool caps | Avoid connection storms |
 
-Quando o limite estoura, a gente devolve erros explícitos e amigáveis a retry (ex.: `429` com semântica de `Retry-After` quando aplicável).
+When a limit is exceeded, we return explicit, retry-friendly errors (e.g. `429` with `Retry-After` semantics when applicable).
 
 ---
 
-## 11. Estratégia de retry
+## 11. Retry strategy
 
 ```mermaid
 flowchart TD
-    START[Tentativa N] --> OK{Sucesso?}
-    OK -->|Sim| DONE[ACK / Commit]
-    OK -->|Não| RETRYABLE{Erro retryable?}
-    RETRYABLE -->|Não| FAIL[Falha + alerta / DLQ]
-    RETRYABLE -->|Sim| MAX{N < max?}
-    MAX -->|Sim| BACKOFF[Exponential backoff + jitter]
+    START[Attempt N] --> OK{Success?}
+    OK -->|Yes| DONE[ACK / Commit]
+    OK -->|No| RETRYABLE{Retryable error?}
+    RETRYABLE -->|No| FAIL[Fail + alert / DLQ]
+    RETRYABLE -->|Yes| MAX{N < max?}
+    MAX -->|Yes| BACKOFF[Exponential backoff + jitter]
     BACKOFF --> START
-    MAX -->|Não| DLQ[Dead-letter + page]
+    MAX -->|No| DLQ[Dead-letter + page]
 ```
 
-- Distinguir **transitório** (timeouts, 503) de **permanente** (validação, 404)
-- Limitar tentativas totais; nunca retry infinito no hot path
-- Idempotency tokens evitam side effects duplicados
+- Distinguish **transient** (timeouts, 503) from **permanent** (validation, 404)
+- Cap total attempts; never infinite retry on the hot path
+- Idempotency tokens prevent duplicated side effects
 
 ---
 
-## 12. Alta disponibilidade
+## 12. High availability
 
-| Camada | Postura de HA |
+| Layer | HA posture |
 |---|---|
-| Frontend | Rede edge multi-AZ (Vercel) |
-| API | N ≥ 2 réplicas atrás de reverse proxy |
-| Workers | N ≥ 2; a queue absorve outages curtos |
-| PostgreSQL | HA gerenciado / failover automático (provedor) |
-| Redis | Modo de persistência adequado à durabilidade da queue |
+| Frontend | Multi-AZ edge network (Vercel) |
+| API | N ≥ 2 replicas behind reverse proxy |
+| Workers | N ≥ 2; the queue absorbs short outages |
+| PostgreSQL | Managed HA / automatic failover (provider) |
+| Redis | Persistence mode matched to queue durability needs |
 
-Endpoints de health (`/health/live`, `/health/ready`) controlam tráfego e restarts da orquestração.
+Health endpoints (`/health/live`, `/health/ready`) control traffic and orchestrator restarts.
 
 ---
 
-## 13. Escala horizontal
+## 13. Horizontal scale
 
 ```mermaid
 flowchart LR
@@ -289,27 +291,27 @@ flowchart LR
     W1 & W2 & W3 --> PG
 ```
 
-Gatilhos de escala (manual hoje; automatizado no roadmap):
+Scale triggers (manual today; automated on the roadmap):
 
-- API: CPU / latência p95 / RPS
-- Workers: profundidade da queue / lag / idade do job
+- API: CPU / p95 latency / RPS
+- Workers: queue depth / lag / job age
 
 ---
 
-## 14. Domínios de falha — resumo
+## 14. Failure domains — summary
 
-| Domínio | Contém | Restart independente? |
+| Domain | Contains | Independent restart? |
 |---|---|---|
-| Edge | Deploy Next.js | Sim |
-| Proxy | Nginx | Sim |
-| API | Containers da aplicação | Sim |
-| Workers | Consumidores de jobs | Sim |
-| Cache/Queue | Redis | Sim (com risco de drain da queue) |
-| Dados | PostgreSQL + storage | Orientado a restore |
+| Edge | Next.js deploy | Yes |
+| Proxy | Nginx | Yes |
+| API | Application containers | Yes |
+| Workers | Job consumers | Yes |
+| Cache/Queue | Redis | Yes (with queue-drain risk) |
+| Data | PostgreSQL + storage | Restore-oriented |
 
 ---
 
-## Documentos relacionados
+## Related documents
 
 - [C4 Context](C4/CONTEXT.md) · [Container](C4/CONTAINER.md) · [Component](C4/COMPONENT.md)
 - [SCALABILITY.md](SCALABILITY.md) · [PERFORMANCE.md](PERFORMANCE.md)

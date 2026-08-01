@@ -1,77 +1,79 @@
 # C4 — System Context
 
-> **Nível 1.** Quem usa a Licitera e com quais sistemas externos ela conversa. Sem detalhe interno de tecnologia.
+> **Language:** English · [Português (Brasil)](../pt-br/C4/CONTEXT.md)
+
+> **Level 1.** Who uses Licitech and which external systems it talks to. No internal technology detail.
 
 ---
 
-## Para que serve
+## Purpose
 
-Mostrar **quem** usa o sistema e **de quais sistemas externos** ele depende, sem revelar adapters proprietários ou endpoints de produção.
+Show **who** uses the system and **which external systems** it depends on, without revealing proprietary adapters or production endpoints.
 
 ---
 
-## Diagrama de contexto
+## Context diagram
 
 ```mermaid
 flowchart TB
-    subgraph People["Pessoas"]
-        ANALYST["Analista de Compras"]
-        ADMIN["Admin do Tenant"]
-        OPS["Operador de Plataforma"]
+    subgraph People["People"]
+        ANALYST["Procurement Analyst"]
+        ADMIN["Tenant Admin"]
+        OPS["Platform Operator"]
     end
 
-    LIC["Plataforma Licitera<br/>SaaS de Inteligência em Compras"]
+    LIC["Licitech Platform<br/>Procurement Intelligence SaaS"]
 
-    subgraph External["Sistemas externos"]
-        SRC["Fontes públicas de compras"]
+    subgraph External["External systems"]
+        SRC["Public procurement sources"]
         IDP["Identity Provider<br/>(Supabase Auth)"]
-        MAIL["Provedor de notificações"]
-        PAY["Provedor de billing<br/>(opcional)"]
+        MAIL["Notification provider"]
+        PAY["Billing provider<br/>(optional)"]
     end
 
-    ANALYST -->|"Consulta editais, gerencia fluxos"| LIC
-    ADMIN -->|"Gerencia usuários e config do tenant"| LIC
-    OPS -->|"Deploy, observação, restore"| LIC
+    ANALYST -->|"Queries notices, manages workflows"| LIC
+    ADMIN -->|"Manages users and tenant config"| LIC
+    OPS -->|"Deploy, observe, restore"| LIC
 
-    LIC -->|"Fetch com rate limit"| SRC
-    LIC -->|"Autentica e emite sessões"| IDP
-    LIC -->|"Envia mensagens transacionais"| MAIL
-    LIC -.->|"Ciclo de assinatura"| PAY
+    LIC -->|"Rate-limited fetch"| SRC
+    LIC -->|"Authenticates and issues sessions"| IDP
+    LIC -->|"Sends transactional messages"| MAIL
+    LIC -.->|"Subscription lifecycle"| PAY
 ```
 
 ---
 
-## Atores
+## Actors
 
-| Ator | Objetivos | Onde interage |
+| Actor | Goals | Where they interact |
 |---|---|---|
-| Analista de Compras | Encontrar editais relevantes; acompanhar workflows | Aplicação web |
-| Admin do Tenant | Controlar acesso na organização | Configurações de admin |
-| Operador de Plataforma | Manter o serviço no ar e seguro | CI/CD, observabilidade, runbooks de DR |
+| Procurement Analyst | Find relevant notices; track workflows | Web application |
+| Tenant Admin | Control access in the organization | Admin settings |
+| Platform Operator | Keep the service up and secure | CI/CD, observability, DR runbooks |
 
 ---
 
-## Sistemas externos
+## External systems
 
-| Sistema | Relação | Confiança |
+| System | Relationship | Trust |
 |---|---|---|
-| Fontes públicas de dados | Dados de entrada (pull) | Conteúdo não confiável |
-| Identity provider | AuthN | IdP confiável — ainda assim validamos tokens |
-| Provedor de notificações | Mensagens de saída | API autenticada |
-| Provedor de billing | Ciclo comercial | Integração com least privilege |
+| Public data sources | Inbound data (pull) | Untrusted content |
+| Identity provider | AuthN | Trusted IdP — we still validate tokens |
+| Notification provider | Outbound messages | Authenticated API |
+| Billing provider | Commercial lifecycle | Least-privilege integration |
 
 ---
 
-## Invariantes
+## Invariants
 
-1. Usuários nunca conectam direto no banco
-2. Conteúdo de fontes públicas é não confiável até ser validado
-3. Operadores usam caminhos break-glass que são auditados
+1. Users never connect directly to the database
+2. Content from public sources is untrusted until validated
+3. Operators use break-glass paths that are audited
 
 ---
 
-## Relacionados
+## Related
 
-- [CONTAINER.md](CONTAINER.md) — próximo nível de detalhe
+- [CONTAINER.md](CONTAINER.md) — next level of detail
 - [ARCHITECTURE.md](../ARCHITECTURE.md)
 - [THREAT_MODEL.md](../THREAT_MODEL.md)

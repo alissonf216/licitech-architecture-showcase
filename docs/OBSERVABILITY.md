@@ -1,24 +1,26 @@
-# Observabilidade
+# Observability
 
-> Deixar o sistema diagnosticável quando algo quebra — sem precisar abrir debugger em host de produção.
+> **Language:** English · [Português (Brasil)](pt-br/OBSERVABILITY.md)
+
+> Make the system diagnosable when something breaks — without attaching a debugger to a production host.
 
 ---
 
-## 1. Estratégia de monitoramento
+## 1. Monitoring strategy
 
-A Licitera segue os três pilares clássicos, com correlation IDs costurando tudo:
+Licitech follows the classic three pillars, with correlation IDs stitching them together:
 
-| Pilar | Perguntas principais |
+| Pillar | Primary questions |
 |---|---|
-| **Logs** | O que exatamente aconteceu na request/job X? |
-| **Metrics** | O sistema está saudável *agora*? Os SLOs estão queimando? |
-| **Traces** | Onde a latência acumulou em API → queue → worker → DB? |
+| **Logs** | What exactly happened on request/job X? |
+| **Metrics** | Is the system healthy *right now*? Are SLOs burning? |
+| **Traces** | Where did latency accumulate across API → queue → worker → DB? |
 
 ```mermaid
 flowchart LR
     APP[API / Workers] --> LOG[Structured Logs]
     APP --> MET[Metrics]
-    APP --> TR[Traces — roadmap OTel]
+    APP --> TR[Traces — OTel roadmap]
     LOG --> AGG[Log Aggregation]
     MET --> PROM[Prometheus-compatible]
     TR --> BACKEND[Trace Backend]
@@ -29,48 +31,48 @@ flowchart LR
 ```
 
 > [!TIP]
-> Prefira **sintomas** (latência vista pelo usuário, taxa de erro, lag da queue) a métricas de host de baixo nível como páginas primárias. Métricas de host continuam como contexto de diagnóstico.
+> Prefer **symptoms** (user-visible latency, error rate, queue lag) over low-level host metrics as primary pages. Host metrics remain diagnostic context.
 
 ---
 
 ## 2. Logging
 
-**Padrões**
+**Standards**
 
-- Logs estruturados em JSON
-- Fields: `timestamp`, `level`, `service`, `env`, `correlation_id`, `tenant_id` (quando seguro), `message`
-- **Nunca** logar secrets, tokens, passwords, auth headers crus ou payloads completos de PII
-- Volume de log limitado — sample ou agregue caminhos de alta cardinalidade se precisar
+- Structured JSON logs
+- Fields: `timestamp`, `level`, `service`, `env`, `correlation_id`, `tenant_id` (when safe), `message`
+- **Never** log secrets, tokens, passwords, raw auth headers, or full PII payloads
+- Bounded log volume — sample or aggregate high-cardinality paths if needed
 
-| Level | Uso |
+| Level | Use |
 |---|---|
-| `DEBUG` | Só local / staging |
-| `INFO` | Ciclo de vida, conclusão bem-sucedida de job |
-| `WARN` | Degradação retryable |
-| `ERROR` | Request/job falhou após o handling |
-| `FATAL` | Processo não consegue continuar |
+| `DEBUG` | Local / staging only |
+| `INFO` | Lifecycle, successful job completion |
+| `WARN` | Retryable degradation |
+| `ERROR` | Request/job failed after handling |
+| `FATAL` | Process cannot continue |
 
 ---
 
 ## 3. Metrics
 
-| Categoria | Exemplos |
+| Category | Examples |
 |---|---|
 | RED (API) | Request rate, error rate, duration (p50/p95/p99) |
-| Workers | Jobs processados, fail rate, contagem de retry, lag |
-| Dependencies | Espera do pool de DB, latência Redis, 429s upstream |
-| Saturation | CPU, memória, disco, uso do connection pool |
-| Business (com cuidado) | Registros ingeridos/min (agregado, não sensível) |
+| Workers | Jobs processed, fail rate, retry count, lag |
+| Dependencies | DB pool wait, Redis latency, upstream 429s |
+| Saturation | CPU, memory, disk, connection-pool usage |
+| Business (carefully) | Records ingested/min (aggregated, non-sensitive) |
 
-Exemplo de scrape config: [`prometheus.example.yml`](../config-templates/prometheus.example.yml)
+Example scrape config: [`prometheus.example.yml`](../config-templates/prometheus.example.yml)
 
 ---
 
 ## 4. Tracing
 
-**Hoje:** correlation IDs propagados nos logs da API e nos metadados dos jobs dos workers.
+**Today:** correlation IDs propagated in API logs and worker job metadata.
 
-**Alvo (OpenTelemetry):**
+**Target (OpenTelemetry):**
 
 ```mermaid
 sequenceDiagram
@@ -87,39 +89,39 @@ sequenceDiagram
     W->>DB: span: upsert
 ```
 
-Plano de adoção: auto-instrumentar HTTP + clients de DB primeiro; spans customizados em seções críticas de domínio depois. Veja [ROADMAP.md](../ROADMAP.md).
+Adoption plan: auto-instrument HTTP + DB clients first; custom spans on critical domain sections later. See [ROADMAP.md](../ROADMAP.md).
 
 ---
 
 ## 5. Alerting
 
-| Severidade | Exemplo | Resposta |
+| Severity | Example | Response |
 |---|---|---|
-| **P1** | Disponibilidade da API abaixo do SLO | Page no on-call |
-| **P2** | p95 elevado / burn de error budget | Triagem no mesmo dia |
-| **P3** | Lag da queue acima do limiar soft | Ticket / próximo horário comercial |
-| **P4** | Tendência de crescimento de disco | Trabalho planejado de capacidade |
+| **P1** | API availability below SLO | Page on-call |
+| **P2** | Elevated p95 / error-budget burn | Same-day triage |
+| **P3** | Queue lag above soft threshold | Ticket / next business hours |
+| **P4** | Disk growth trend | Planned capacity work |
 
-Regras de design de alerta:
+Alert design rules:
 
-- Alertar por **burn rate** / sintomas, não por um blip isolado
-- Todo alerta tem link para runbook
-- Sem alertas órfãos — owners obrigatórios
+- Alert on **burn rate** / symptoms, not an isolated blip
+- Every alert links to a runbook
+- No orphan alerts — owners required
 
 ---
 
 ## 6. Health checks
 
-| Endpoint | Semântica |
+| Endpoint | Semantics |
 |---|---|
-| `/health/live` | Processo no ar |
-| `/health/ready` | Dependencies alcançáveis (DB, queue) |
+| `/health/live` | Process up |
+| `/health/ready` | Dependencies reachable (DB, queue) |
 
-Orquestradores reiniciam em falha de liveness; load balancers removem em falha de readiness.
+Orchestrators restart on liveness failure; load balancers remove on readiness failure.
 
 ---
 
-## 7. Resposta a incidentes
+## 7. Incident response
 
 ```mermaid
 flowchart TD
@@ -130,31 +132,31 @@ flowchart TD
     E --> F[Action items]
 ```
 
-| Fase | Ações |
+| Phase | Actions |
 |---|---|
-| Detect | Alerta / reporte de usuário |
-| Triage | Severidade, raio de impacto, caça ao correlation ID |
-| Mitigate | Rollback, scale out, desligar feature flag, rate-limit |
-| Resolve | Confirmar que SLOs estão voltando |
-| Postmortem | Sem culpa; timeline; fatores contribuintes; correções |
+| Detect | Alert / user report |
+| Triage | Severity, blast radius, correlation-ID hunt |
+| Mitigate | Rollback, scale out, feature-flag off, rate-limit |
+| Resolve | Confirm SLOs are recovering |
+| Postmortem | Blameless; timeline; contributing factors; fixes |
 
-Incidentes de segurança também seguem o caminho de notificação de breach sob considerações de LGPD ([SECURITY_AND_COMPLIANCE.md](SECURITY_AND_COMPLIANCE.md)).
+Security incidents also follow the breach-notification path under LGPD considerations ([SECURITY_AND_COMPLIANCE.md](SECURITY_AND_COMPLIANCE.md)).
 
 ---
 
-## 8. Adoção futura de OpenTelemetry
+## 8. Future OpenTelemetry adoption
 
-| Passo | Resultado |
+| Step | Outcome |
 |---|---|
-| 1. Escolher backend OTLP | Export vendor-neutral |
-| 2. Instrumentar a API | Spans de HTTP + DB |
-| 3. Propagar para jobs | Contexto em header / payload da queue |
-| 4. Unificar com logs | Field `trace_id` nos logs JSON |
-| 5. Alertas baseados em trace | Detecção de dependency lenta |
+| 1. Choose OTLP backend | Vendor-neutral export |
+| 2. Instrument the API | HTTP + DB spans |
+| 3. Propagate into jobs | Context in queue header / payload |
+| 4. Unify with logs | `trace_id` field in JSON logs |
+| 5. Trace-based alerts | Slow-dependency detection |
 
 ---
 
-## Documentos relacionados
+## Related documents
 
 - [ARCHITECTURE.md](ARCHITECTURE.md)
 - [DEVOPS_AND_CICD.md](DEVOPS_AND_CICD.md)

@@ -1,4 +1,6 @@
-# ADR 0003 — Escolha do Supabase
+# ADR 0003 — Supabase Selection
+
+> **Language:** English · [Português (Brasil)](../pt-br/ADR/0003-supabase-selection.md)
 
 - **Status:** Accepted
 - **Date:** 2025-01-20
@@ -8,70 +10,70 @@
 
 ## Context
 
-A Licitera precisa de:
+Licitech needs:
 
-- Um sistema de registro relacional com consistência forte
-- Isolamento multi-tenant aplicável perto dos dados
-- Autenticação adequada para um produto SaaS
-- Object storage para artefatos, sem levantar um stack separado no dia um
+- A relational system of record with strong consistency
+- Multi-tenant isolation enforceable close to the data
+- Authentication suitable for a SaaS product
+- Object storage for artifacts, without standing up a separate stack on day one
 
-O time preferiu comprar o trabalho pesado indiferenciado (HA Postgres, auth, storage) e gastar engenharia nos fluxos de domínio de procurement.
+The team preferred to buy undifferentiated heavy lifting (HA Postgres, auth, storage) and spend engineering on procurement domain flows.
 
 ---
 
 ## Decision
 
-Adotar o **Supabase** como plano gerenciado de dados e auth:
+Adopt **Supabase** as the managed data and auth plane:
 
-- **PostgreSQL** para o estado canônico
-- **Supabase Auth** para identidade
-- **Storage** para blobs
-- **Row Level Security** como controle obrigatório de tenancy
+- **PostgreSQL** for canonical state
+- **Supabase Auth** for identity
+- **Storage** for blobs
+- **Row Level Security** as mandatory tenancy control
 
-O código da aplicação acessa dados por abstrações de repositório, para o vendor não vazar pelo codebase inteiro.
+Application code accesses data through repository abstractions, so the vendor does not leak across the entire codebase.
 
 ---
 
 ## Alternatives Considered
 
-| Alternativa | Por que não (agora) |
+| Alternative | Why not (now) |
 |---|---|
-| **Postgres self-managed + Keycloak + MinIO** | Carga de ops alta para as mesmas primitivas |
-| **Firebase / Firestore** | Modelo relacional mais fraco para entidades de procurement |
-| **PlanetScale / serverless MySQL + auth custom** | Modelo de policy estilo RLS menos natural; mais glue code |
-| **AWS Amplify / AppSync** | Mais acoplamento AWS do que queremos |
+| **Self-managed Postgres + Keycloak + MinIO** | High ops load for the same primitives |
+| **Firebase / Firestore** | Weaker relational model for procurement entities |
+| **PlanetScale / serverless MySQL + custom auth** | RLS-style policy model less natural; more glue code |
+| **AWS Amplify / AppSync** | More AWS coupling than we want |
 
 ---
 
 ## Trade-offs
 
-| Benefício | Custo |
+| Benefit | Cost |
 |---|---|
-| Baseline rápido de segurança multi-tenant (RLS) | Acoplamento a features do vendor se exagerar (ex.: SDK vazando em todo lugar) |
-| Backups / HA gerenciados | Drills de restore ainda são obrigatórios (confie, mas verifique) |
-| Auth + DB + storage no mesmo lugar | Restrições regionais / de preço do provider |
-| Menos ops indiferenciada | Precisa de camada de abstração para portabilidade futura |
+| Fast multi-tenant security baseline (RLS) | Vendor-feature coupling if overused (e.g. SDK leaking everywhere) |
+| Managed backups / HA | Restore drills are still mandatory (trust, but verify) |
+| Auth + DB + storage in one place | Provider regional / pricing constraints |
+| Less undifferentiated ops | Needs an abstraction layer for future portability |
 
 ---
 
 ## Consequences
 
-**Positivo**
+**Positive**
 
-- Isolamento de tenant testado na camada de DB — defense in depth com RBAC na API
-- Auth flows prontos mais cedo
-- História de PITR / backup nas mãos do provider, com RPO/RTO documentados
+- Tenant isolation tested at the DB layer — defense in depth with API RBAC
+- Auth flows ready earlier
+- PITR / backup story in the provider's hands, with documented RPO/RTO
 
-**Negativo / Follow-ups**
+**Negative / Follow-ups**
 
-- Proibir uso ad-hoc de `service_role` fora de workers auditados
-- Manter migrations de SQL/policy no version control
-- Validar periodicamente a escape hatch: Postgres puro + IdP externo continua viável
+- Forbid ad-hoc `service_role` use outside audited workers
+- Keep SQL/policy migrations in version control
+- Periodically validate the escape hatch: plain Postgres + external IdP remains viable
 
 **Non-goals**
 
-- Implementar regras de negócio só em triggers de banco
-- Expor chaves privilegiadas no browser
+- Implementing business rules only in database triggers
+- Exposing privileged keys in the browser
 
 ---
 

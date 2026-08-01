@@ -1,174 +1,176 @@
 # Roadmap
 
-Este roadmap descreve como a plataforma Licitera deve evoluir em arquitetura e operação. É propositalmente alto nível e independente de qualquer implementação proprietária.
+> **Language:** English · [Português (Brasil)](ROADMAP-pt-br.md)
+
+This roadmap describes how the Licitech platform should evolve in architecture and operations. It is intentionally high-level and independent of any proprietary implementation.
 
 ---
 
-## Onde estamos hoje
+## Where we are today
 
-| Capacidade | Status | Notas |
+| Capability | Status | Notes |
 |---|---|---|
-| API e workers containerizados | ✅ Em produção | Docker Compose + Dokploy |
-| Frontend na edge (Vercel) | ✅ Em produção | Next.js na Edge Network |
-| PostgreSQL gerenciado (Supabase) | ✅ Em produção | Plano de dados com RLS |
-| CI no GitHub Actions | ✅ Em produção | Lint, teste, scan, build |
-| Logs estruturados | ✅ Em produção | JSON → agregação |
-| Health checks e restart policies | ✅ Em produção | Probes por container |
-| Processamento assíncrono por fila | ✅ Em produção | Workers com Redis |
-| Segurança em camadas | ✅ Em produção | Ver [SECURITY_AND_COMPLIANCE.md](docs/SECURITY_AND_COMPLIANCE.md) |
+| Containerized API and workers | ✅ In production | Docker Compose + Dokploy |
+| Frontend on the edge (Vercel) | ✅ In production | Next.js on the Edge Network |
+| Managed PostgreSQL (Supabase) | ✅ In production | Data plane with RLS |
+| CI on GitHub Actions | ✅ In production | Lint, test, scan, build |
+| Structured logs | ✅ In production | JSON → aggregation |
+| Health checks and restart policies | ✅ In production | Per-container probes |
+| Async queue processing | ✅ In production | Workers with Redis |
+| Layered security | ✅ In production | See [SECURITY_AND_COMPLIANCE.md](docs/SECURITY_AND_COMPLIANCE.md) |
 
 ```mermaid
 timeline
-    title Evolução da plataforma
-    section Hoje
-        Docker + Dokploy : API stateless
-                        : Pools de workers
+    title Platform evolution
+    section Today
+        Docker + Dokploy : Stateless API
+                        : Worker pools
                         : Health probes
         Vercel Edge     : SSR / Edge
                         : CDN
         Supabase        : PostgreSQL + RLS
                         : Auth
-    section Curto prazo
-        Observabilidade : OpenTelemetry
-                        : Tracing distribuído
-        Entrega         : Canary releases
+    section Near term
+        Observability : OpenTelemetry
+                        : Distributed tracing
+        Delivery         : Canary releases
                         : Secrets Manager
-        Infra as Code   : Módulos Terraform
-    section Longo prazo
-        Orquestração    : Avaliação de Kubernetes
+        Infra as Code   : Terraform modules
+    section Long term
+        Orchestration    : Kubernetes evaluation
                         : Service mesh
-        Resiliência     : Blue/green
-                        : DR multi-região
+        Resilience     : Blue/green
+                        : Multi-region DR
 ```
 
 ---
 
-## Curto prazo (0–6 meses)
+## Near term (0–6 months)
 
-### Observabilidade de verdade
+### Real observability
 
-- Adotar **OpenTelemetry** para traces, métricas e logs com o mesmo modelo de correlação
-- Tracing distribuído no caminho API → fila → worker → banco
-- Definir SLOs (disponibilidade, latência p95/p99, error budget) e alertar por burn rate
+- Adopt **OpenTelemetry** for traces, metrics, and logs under the same correlation model
+- Distributed tracing on the API → queue → worker → database path
+- Define SLOs (availability, p95/p99 latency, error budget) and alert on burn rate
 
-### Entrega mais segura
+### Safer delivery
 
-- **Canary releases** nas imagens de backend (promoção com peso de tráfego)
-- **Rollback** automático quando o health check pós-deploy falhar
-- **Secrets Manager** centralizado (sair de env files no host)
+- **Canary releases** for backend images (promotion with traffic weighting)
+- Automatic **rollback** when the post-deploy health check fails
+- Centralized **Secrets Manager** (move off host env files)
 
-### Infraestrutura como código
+### Infrastructure as code
 
-- Módulos Terraform (ou equivalente) para:
-  - provisionar o host de compute
-  - DNS / certificados TLS
-  - stack de monitoramento
+- Terraform modules (or equivalent) to:
+  - provision the compute host
+  - DNS / TLS certificates
+  - monitoring stack
   - network ACLs
-- Detecção de drift contra o estado declarado
+- Drift detection against declared state
 
-### Endurecimento de segurança
+### Security hardening
 
-- Geração contínua de SBOM e SLAs de vulnerabilidade
-- PRs automáticos de dependências com gates de política
-- Scan de secrets no CI (já existe em parte — ampliar cobertura)
+- Continuous SBOM generation and vulnerability SLAs
+- Automatic dependency PRs with policy gates
+- Secret scanning in CI (partially present — broaden coverage)
 
 > [!NOTE]
-> No curto prazo, priorizamos **qualidade do sinal operacional** e **segurança de deploy** — não features de produto novas.
+> In the near term, we prioritize **operational signal quality** and **deploy safety** — not new product features.
 
 ---
 
-## Longo prazo (6–18 meses)
+## Long term (6–18 months)
 
-### Evolução da orquestração
+### Orchestration evolution
 
-| Opção | Quando avaliar | Benefício esperado |
+| Option | When to evaluate | Expected benefit |
 |---|---|---|
-| Continuar com Docker + Dokploy | Tráfego e ops ainda cabem no time | Menor overhead operacional |
-| Kubernetes gerenciado | Muitos serviços, HPA, multi-região | Scheduling declarativo, rede mais rica |
-| Híbrido | Edge no Vercel; data plane no K8s | Migração incremental |
+| Stay with Docker + Dokploy | Traffic and ops still fit the team | Lower operational overhead |
+| Managed Kubernetes | Many services, HPA, multi-region | Declarative scheduling, richer networking |
+| Hybrid | Edge on Vercel; data plane on K8s | Incremental migration |
 
-O [ADR 0001](docs/ADR/0001-docker-over-kubernetes.md) registra a decisão original e os critérios de saída.
+[ADR 0001](docs/ADR/0001-docker-over-kubernetes.md) records the original decision and exit criteria.
 
-### Deploy blue / green
+### Blue / green deploy
 
-- Dois slots de ambiente com troca atômica de tráfego
-- Migrações de banco no padrão dual-write / expand-contract
-- Rollback instantâneo por DNS ou load balancer
+- Two environment slots with atomic traffic switch
+- Database migrations in the dual-write / expand-contract pattern
+- Instant rollback via DNS or load balancer
 
-### Service mesh (só se fizer sentido)
+### Service mesh (only if it pays off)
 
-- Avaliar só se o volume de tráfego east-west e a exigência de mTLS pagarem o custo do control plane
-- Candidatos leves (sidecar ou ambient) — decidir depois do caminho K8s
+- Evaluate only if east-west traffic volume and mTLS requirements justify control-plane cost
+- Lightweight candidates (sidecar or ambient) — decide after the K8s path
 
-### Disaster recovery multi-região
+### Multi-region disaster recovery
 
-- Réplicas de PostgreSQL cross-region (ou restore via PITR numa região secundária)
-- Failover ativo/passivo do frontend
-- Metas alongadas: RPO ≤ 1 h / RTO ≤ 4 h (ver [DISASTER_RECOVERY.md](docs/DISASTER_RECOVERY.md))
+- Cross-region PostgreSQL replicas (or restore via PITR in a secondary region)
+- Active/passive frontend failover
+- Stretch targets: RPO ≤ 1 h / RTO ≤ 4 h (see [DISASTER_RECOVERY.md](docs/DISASTER_RECOVERY.md))
 
 ---
 
-## Melhorias em radar
+## Improvements on the radar
 
-| Área | Melhoria | Valor |
+| Area | Improvement | Value |
 |---|---|---|
-| Autoscaling | Scale de workers por CPU / profundidade da fila | Absorver picos de ingestão sem overprovisionar |
-| Cache | Multi-camada (edge + app + Redis) | Baixar p95 em leituras quentes |
-| Dados | Read replicas para analytics | Isolar OLTP de reporting |
-| Segurança | Gestão de chaves com hardware | Ciclo de vida de chave mais forte |
-| Compliance | Ritmo formal de revisão de DPIA (LGPD) | Alinhamento regulatório contínuo |
-| Performance | Budget de query plan no CI | Evitar regressão de queries lentas |
-| DX | Bot de ADR | Exigir ADR em mudanças relevantes |
-| Chaos | Injeção controlada de falha | Validar hipóteses de blast radius |
+| Autoscaling | Scale workers by CPU / queue depth | Absorb ingestion spikes without overprovisioning |
+| Cache | Multi-layer (edge + app + Redis) | Lower p95 on hot reads |
+| Data | Read replicas for analytics | Isolate OLTP from reporting |
+| Security | Hardware-backed key management | Stronger key lifecycle |
+| Compliance | Formal DPIA review cadence (LGPD) | Continuous regulatory alignment |
+| Performance | Query-plan budget in CI | Prevent slow-query regressions |
+| DX | ADR bot | Require ADRs on material changes |
+| Chaos | Controlled failure injection | Validate blast-radius hypotheses |
 
 ```mermaid
 mindmap
-  root((Temas do roadmap))
-    Observabilidade
+  root((Roadmap themes))
+    Observability
       OpenTelemetry
-      Alertas por burn rate
-      Debug guiado por trace
-    Entrega
+      Burn-rate alerts
+      Trace-guided debug
+    Delivery
       Canary
       Blue/Green
-      Rollback automático
-    Infraestrutura
+      Automatic rollback
+    Infrastructure
       Terraform
       Secrets Manager
       Autoscaling
-    Evolução da plataforma
-      Avaliação de Kubernetes
-      Service mesh (condicional)
-      DR multi-região
+    Platform evolution
+      Kubernetes evaluation
+      Service mesh (conditional)
+      Multi-region DR
 ```
 
 ---
 
-## O que explicitamente *não* vamos fazer neste horizonte
+## What we explicitly will *not* do in this horizon
 
-- Reescrever a plataforma em outra stack
-- Abstrair multi-cloud cedo demais
-- Adotar Kubernetes sem pressão operacional mensurável
-- Construir um orquestrador próprio
-
----
-
-## Gates de decisão
-
-Toda item grande do roadmap precisa passar por:
-
-1. **Problema claro** — dor ou risco mensurável
-2. **ADR** — alternativas e trade-offs registrados
-3. **Prontidão operacional** — runbooks, alertas, rollback
-4. **Revisão de segurança** — delta no threat model
-5. **Modelo de custo** — steady-state e pico
+- Rewrite the platform on another stack
+- Abstract multi-cloud too early
+- Adopt Kubernetes without measurable operational pressure
+- Build a custom orchestrator
 
 ---
 
-## Documentos relacionados
+## Decision gates
+
+Every major roadmap item must pass:
+
+1. **Clear problem** — measurable pain or risk
+2. **ADR** — alternatives and trade-offs recorded
+3. **Operational readiness** — runbooks, alerts, rollback
+4. **Security review** — delta to the threat model
+5. **Cost model** — steady-state and peak
+
+---
+
+## Related documents
 
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - [DEVOPS_AND_CICD.md](docs/DEVOPS_AND_CICD.md)
 - [SCALABILITY.md](docs/SCALABILITY.md)
 - [DISASTER_RECOVERY.md](docs/DISASTER_RECOVERY.md)
-- [Índice de ADRs](docs/ADR/)
+- [ADR index](docs/ADR/)

@@ -1,18 +1,20 @@
 # DevOps & CI/CD
 
-> Como a gente entrega a Licitera: pipelines, artefatos, promoção e rollback. Nomes e endpoints abaixo são **exemplos genéricos**.
+> **Language:** English · [Português (Brasil)](pt-br/DEVOPS_AND_CICD.md)
+
+> How we ship Licitech: pipelines, artifacts, promotion, and rollback. Names and endpoints below are **generic examples**.
 
 ---
 
-## 1. Objetivos de design
+## 1. Design goals
 
-| Objetivo | Medida |
+| Goal | Measure |
 |---|---|
-| Feedback rápido | Checks de PR terminam dentro de um orçamento de minutos |
-| Mudanças seguras em produção | Promoção com health gate; caminho de rollback em um comando |
-| Builds reproduzíveis | Imagens imutáveis, content-addressed / com tag |
-| Supply chain segura | Lint + SAST + scan de dependência + scan de imagem como blockers de merge |
-| Paridade de ambientes | O mesmo artefato de imagem sobe de staging → production |
+| Fast feedback | PR checks finish within a minutes budget |
+| Safe production changes | Promotion with health gate; one-command rollback path |
+| Reproducible builds | Immutable images, content-addressed / tagged |
+| Secure supply chain | Lint + SAST + dependency scan + image scan as merge blockers |
+| Environment parity | The same image artifact promotes staging → production |
 
 ```mermaid
 flowchart LR
@@ -28,34 +30,34 @@ flowchart LR
 
 ## 2. GitHub Actions
 
-O GitHub Actions é o único orquestrador de CI/CD (veja [notas orientadas a ADR em TECHNOLOGY_CHOICES](TECHNOLOGY_CHOICES.md)).
+GitHub Actions is the sole CI/CD orchestrator (see [ADR-oriented notes in TECHNOLOGY_CHOICES](TECHNOLOGY_CHOICES.md)).
 
-**Por quê**
+**Why**
 
-- Fica junto do código; branch protections mapeiam direto para required checks
-- Marketplace rico de actions de segurança e qualidade
-- Capaz de OIDC para auth em cloud sem chaves de longa duração (roadmap)
+- Lives next to the code; branch protections map directly to required checks
+- Rich marketplace of security and quality actions
+- Capable of OIDC for cloud auth without long-lived keys (roadmap)
 
-**Restrições**
+**Constraints**
 
-- Concorrência de runners e orçamento de minutos precisam de monitoramento
-- Secrets escopados por ambiente; nunca ecoados em logs
+- Runner concurrency and minutes budget need monitoring
+- Secrets scoped per environment; never echoed in logs
 
-Exemplo de workflow (template não funcional): [`.github/workflows/deploy.example.yml`](../.github/workflows/deploy.example.yml)
+Example workflow (non-functional template): [`.github/workflows/deploy.example.yml`](../.github/workflows/deploy.example.yml)
 
 ---
 
-## 3. Pipeline de CI
+## 3. CI pipeline
 
-| Estágio | Propósito | Em caso de falha |
+| Stage | Purpose | On failure |
 |---|---|---|
-| Checkout | Busca o commit SHA | Aborta |
-| Install de dependências | Install travado (`npm ci` / `pip` em modo hash) | Aborta |
-| Lint / typecheck | Estilo + correção estática | Aborta |
-| Unit tests | Suite rápida | Aborta |
-| Integration tests (opcional) | Checks de contrato contra deps efêmeras | Aborta |
-| Security scan (SAST) | Padrões no código | Aborta em high/critical pela política |
-| Dependency scan | Gate de CVE | Aborta em violação de política |
+| Checkout | Fetch the commit SHA | Abort |
+| Dependency install | Locked install (`npm ci` / hashed `pip`) | Abort |
+| Lint / typecheck | Style + static correctness | Abort |
+| Unit tests | Fast suite | Abort |
+| Integration tests (optional) | Contract checks against ephemeral deps | Abort |
+| Security scan (SAST) | Patterns in code | Abort on high/critical per policy |
+| Dependency scan | CVE gate | Abort on policy violation |
 
 ```mermaid
 flowchart TD
@@ -64,68 +66,68 @@ flowchart TD
     B --> D[unit tests]
     B --> E[SAST]
     B --> F[dependency scan]
-    C & D & E & F --> G{Tudo verde?}
-    G -->|sim| H[Segue para o build]
-    G -->|não| X[Falha no status check]
+    C & D & E & F --> G{All green?}
+    G -->|yes| H[Proceed to build]
+    G -->|no| X[Fail status check]
 ```
 
 > [!IMPORTANT]
-> O CI precisa ser **hermético**: sem depender de redes de produção, dados de produção ou imagens base mutáveis `latest` sem pin de digest.
+> CI must be **hermetic**: no dependency on production networks, production data, or mutable `latest` base images without digest pins.
 
 ---
 
-## 4. Pipeline de build
+## 4. Build pipeline
 
-1. Resolver digests das imagens base
-2. Docker build multi-stage (deps → build → runtime)
-3. Tag com **git SHA** e **semver** opcional
-4. Gerar SBOM (CycloneDX/SPDX) como artefato do build
-5. Push para o registry só depois do scan da imagem passar
+1. Resolve base image digests
+2. Multi-stage Docker build (deps → build → runtime)
+3. Tag with **git SHA** and optional **semver**
+4. Generate SBOM (CycloneDX/SPDX) as a build artifact
+5. Push to the registry only after the image scan passes
 
 ---
 
 ## 5. Docker build
 
-**Princípios**
+**Principles**
 
-- Usuário runtime não-root
-- Base mínima (distroless / slim)
-- Sem secrets nas layers — BuildKit secret mounts se precisar
-- `.dockerignore` exclui env local, caches de teste e docs desnecessários
+- Non-root runtime user
+- Minimal base (distroless / slim)
+- No secrets in layers — BuildKit secret mounts if needed
+- `.dockerignore` excludes local env, test caches, and unnecessary docs
 
 ```mermaid
 flowchart LR
     CTX[Build Context] --> S1[Stage: deps]
     S1 --> S2[Stage: build]
     S2 --> S3[Stage: runtime]
-    S3 --> IMG[Imagem com Tag]
+    S3 --> IMG[Tagged Image]
     IMG --> SCAN[Vulnerability Scan]
     SCAN --> REG[Registry]
 ```
 
 ---
 
-## 6. Versionamento de imagens
+## 6. Image versioning
 
-| Tag | Significado |
+| Tag | Meaning |
 |---|---|
-| `sha-<gitsha>` | Identidade imutável do build (preferida para deploy) |
-| `semver-x.y.z` | Label humana de release (opcional) |
-| `staging` / `prod` | Ponteiros móveis — nunca a única referência de deploy |
+| `sha-<gitsha>` | Immutable build identity (preferred for deploy) |
+| `semver-x.y.z` | Human release label (optional) |
+| `staging` / `prod` | Moving pointers — never the sole deploy reference |
 
-Manifests de deploy referenciam **digest ou tag sha**, não `latest`.
+Deploy manifests reference **digest or sha tag**, not `latest`.
 
 ---
 
 ## 7. Health checks
 
-| Probe | Pergunta | Usado por |
+| Probe | Question | Used by |
 |---|---|---|
-| Liveness | Processo vivo? | Restart do orquestrador |
-| Readiness | Seguro receber tráfego? | LB / gate de deploy |
-| Startup | Boot terminou? | Evitar kill prematuro |
+| Liveness | Process alive? | Orchestrator restart |
+| Readiness | Safe to receive traffic? | LB / deploy gate |
+| Startup | Boot finished? | Avoid premature kill |
 
-Pós-deploy: request sintético contra readiness + caminho crítico de leitura.
+Post-deploy: synthetic request against readiness + critical read path.
 
 ---
 
@@ -143,12 +145,12 @@ sequenceDiagram
     CD->>P: Add N to upstream
     CD->>P: Drain O
     CD->>O: Stop (graceful)
-    Note over CD,P: Repete até todas as réplicas atualizadas
+    Note over CD,P: Repeat until all replicas updated
 ```
 
-- Connection draining com timeout de graceful shutdown
-- Compatível com a semântica de restart do Dokploy/Docker
-- Migrations de banco seguem **expand/contract** — nunca quebrar réplicas antigas no meio do roll
+- Connection draining with graceful shutdown timeout
+- Compatible with Dokploy/Docker restart semantics
+- Database migrations follow **expand/contract** — never break old replicas mid-roll
 
 ---
 
@@ -156,74 +158,74 @@ sequenceDiagram
 
 Checklist:
 
-- [ ] Mudanças de schema backward-compatible primeiro
-- [ ] Dual-write ou feature flags quando precisar
-- [ ] Readiness antes de deslocar tráfego
-- [ ] Sem deploys de API em single-replica em produção
-- [ ] Skew de versão frontend/API tolerado dentro de N releases
+- [ ] Backward-compatible schema changes first
+- [ ] Dual-write or feature flags when needed
+- [ ] Readiness before shifting traffic
+- [ ] No single-replica API deploys in production
+- [ ] Frontend/API version skew tolerated within N releases
 
 ---
 
-## 10. Estratégia de rollback
+## 10. Rollback strategy
 
-| Gatilho | Ação |
+| Trigger | Action |
 |---|---|
-| Readiness falhou depois do deploy | Redeploy da imagem `sha-*` anterior |
-| Taxa de erro / burn de SLO elevados | Rollback automático ou iniciado pelo operador |
-| Migration ruim | Forward-fix preferido; restore de backup só se necessário |
+| Readiness failed after deploy | Redeploy previous `sha-*` image |
+| Elevated error rate / SLO burn | Automatic or operator-initiated rollback |
+| Bad migration | Forward-fix preferred; backup restore only if necessary |
 
 ```mermaid
 flowchart TD
     D[Deploy sha-NEW] --> H{Health / SLO OK?}
-    H -->|Sim| K[Mantém]
-    H -->|Não| R[Redeploy sha-OLD]
-    R --> V[Verifica]
-    V --> I[Nota de incidente + postmortem]
+    H -->|Yes| K[Keep]
+    H -->|No| R[Redeploy sha-OLD]
+    R --> V[Verify]
+    V --> I[Incident note + postmortem]
 ```
 
 > [!WARNING]
-> Rollback de migrations **destrutivas** não é de graça. Prefira expand/contract e feature flags para que o rollback de imagem seja suficiente.
+> Rollback of **destructive** migrations is not free. Prefer expand/contract and feature flags so image rollback is enough.
 
 ---
 
-## 11. Armazenamento de artefatos
+## 11. Artifact storage
 
-| Artefato | Retenção | Notas |
+| Artifact | Retention | Notes |
 |---|---|---|
-| Imagens de container | N dias / últimos M SHAs de produção | Endereçáveis por digest |
-| SBOM / relatórios de scan | Alinhado à janela de compliance | Anexados à run de CI |
-| Logs de build | Default da plataforma + export para incidentes | Redigir secrets |
+| Container images | N days / last M production SHAs | Addressable by digest |
+| SBOM / scan reports | Aligned to compliance window | Attached to CI run |
+| Build logs | Platform default + export for incidents | Redact secrets |
 
 ---
 
-## 12. Promoção entre ambientes
+## 12. Environment promotion
 
 ```text
 PR checks → merge → build → staging deploy → health → production promote
 ```
 
-| Regra | Detalhe |
+| Rule | Detail |
 |---|---|
-| Mesmo artefato | Produção roda a imagem validada em staging |
-| Secrets separados | Credenciais de staging nunca reutilizadas em produção |
-| Aprovação manual | Gate opcional para produção (GitHub Environment) |
-| Registro de mudança | Ligar o deploy ao commit SHA + URL da run de CI |
+| Same artifact | Production runs the image validated in staging |
+| Separated secrets | Staging credentials never reused in production |
+| Manual approval | Optional gate for production (GitHub Environment) |
+| Change record | Tie the deploy to commit SHA + CI run URL |
 
 ---
 
-## 13. Validação de infraestrutura
+## 13. Infrastructure validation
 
-Antes de aceitar um deploy:
+Before accepting a deploy:
 
-- Lint de Compose / config de deploy
-- Chaves de env obrigatórias presentes (só nomes — valores vêm do secret store)
-- Certificados TLS válidos além do limiar
-- Espaço em disco / inodes no host
-- Conectividade de queue e DB no probe de readiness
+- Compose / deploy config lint
+- Required env keys present (names only — values come from the secret store)
+- TLS certificates valid beyond the threshold
+- Disk space / inodes on the host
+- Queue and DB connectivity in the readiness probe
 
 ---
 
-## Documentos relacionados
+## Related documents
 
 - [ARCHITECTURE.md](ARCHITECTURE.md)
 - [SECURITY_AND_COMPLIANCE.md](SECURITY_AND_COMPLIANCE.md)

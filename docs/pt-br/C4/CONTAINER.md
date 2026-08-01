@@ -1,18 +1,18 @@
 # C4 — Containers
 
-> **Language:** English · [Português (Brasil)](../pt-br/C4/CONTAINER.md)
+> **Idioma:** [English](../../C4/CONTAINER.md) · Português (Brasil)
 
-> **Level 2.** Units that deploy and run independently, and how they talk to each other. Sanitized names only.
-
----
-
-## Purpose
-
-Describe the main **containers** in the C4 sense (not just Docker): applications and stores you can deploy and reason about separately.
+> **Nível 2.** Unidades que sobem e rodam de forma independente, e como elas se falam. Só nomes sanitizados.
 
 ---
 
-## Container diagram
+## Para que serve
+
+Descrever os principais **containers** no sentido C4 (não só Docker): aplicações e stores que dá para deployar e raciocinar separados.
+
+---
+
+## Diagrama de containers
 
 ```mermaid
 flowchart TB
@@ -49,34 +49,34 @@ flowchart TB
 
 ---
 
-## Container catalog
+## Catálogo de containers
 
-| Container | Technology | Responsibilities |
+| Container | Tecnologia | Responsabilidades |
 |---|---|---|
-| Web Application | Next.js / TypeScript | UI, edge middleware, calls the API |
-| Reverse Proxy | Nginx | TLS termination, routing, headers |
-| API Application | Python | Synchronous commands/queries, authZ, enqueue |
-| Worker Application | Python | Async jobs: ingest, enrich, notify |
-| Queue / Cache | Redis | Job broker, ephemeral cache, rate counters |
+| Web Application | Next.js / TypeScript | UI, edge middleware, chama a API |
+| Reverse Proxy | Nginx | Término de TLS, roteamento, headers |
+| API Application | Python | Commands/queries síncronos, authZ, enqueue |
+| Worker Application | Python | Jobs assíncronos: ingest, enrich, notify |
+| Queue / Cache | Redis | Broker de jobs, cache efêmero, contadores de rate |
 | Database | PostgreSQL | System of record + RLS |
-| Auth Service | Supabase Auth | Identity, tokens |
-| Object Storage | Supabase Storage | Blobs / artifacts |
+| Auth Service | Supabase Auth | Identidade, tokens |
+| Object Storage | Supabase Storage | Blobs / artefatos |
 
 ---
 
-## Communication summary
+## Resumo de comunicação
 
-| From | To | Protocol | Auth |
+| De | Para | Protocolo | Auth |
 |---|---|---|---|
 | Web → Proxy/API | HTTPS | JWT / session |
-| API → Redis | Internal TCP | Network isolation |
-| API → Postgres | TLS | DB credentials + RLS context |
-| Worker → Sources | HTTPS | N/A (public) + allowlists |
-| Worker → Storage | HTTPS | Service credentials |
+| API → Redis | TCP interno | Isolamento de rede |
+| API → Postgres | TLS | Credenciais de DB + contexto RLS |
+| Worker → Sources | HTTPS | N/A (público) + allowlists |
+| Worker → Storage | HTTPS | Credenciais de serviço |
 
 ---
 
-## Deploy mapping
+## Mapeamento de deploy
 
 ```mermaid
 flowchart LR
@@ -106,7 +106,7 @@ flowchart LR
 
 ---
 
-## Related
+## Relacionados
 
 - [CONTEXT.md](CONTEXT.md)
 - [COMPONENT.md](COMPONENT.md)

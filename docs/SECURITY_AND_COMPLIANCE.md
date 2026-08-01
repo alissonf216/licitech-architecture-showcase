@@ -1,32 +1,34 @@
-# Segurança & Compliance
+# Security & Compliance
 
-> Documentação pública de segurança da arquitetura. Sem secrets reais, certificados ou identificadores de produção.
+> **Language:** English · [Português (Brasil)](pt-br/SECURITY_AND_COMPLIANCE.md)
+
+> Public security documentation for the architecture. No real secrets, certificates, or production identifiers.
 
 ---
 
-## 1. Visão da postura de segurança
+## 1. Security posture overview
 
-A Licitera trabalha com **defense in depth** e pressupostos de **zero-trust** entre camadas. Cada hop autentica e autoriza — só estar na rede nunca basta.
+Licitech operates with **defense in depth** and **zero-trust** assumptions between layers. Every hop authenticates and authorizes — being on the network is never enough.
 
 ```mermaid
 flowchart TB
-    subgraph L1["Camada 1 — Edge"]
+    subgraph L1["Layer 1 — Edge"]
         TLS1[TLS]
-        WAF[Proteções de edge]
+        WAF[Edge protections]
         HEAD[Secure headers]
     end
-    subgraph L2["Camada 2 — Aplicação"]
+    subgraph L2["Layer 2 — Application"]
         AUTH[Authentication]
         AUTHZ[Authorization]
-        VAL[Validação de input]
+        VAL[Input validation]
         ENC[Output encoding]
     end
-    subgraph L3["Camada 3 — Dados"]
+    subgraph L3["Layer 3 — Data"]
         RLS[Row Level Security]
         ENC2[Encryption at rest]
-        BACKUP[Controle de acesso a backups]
+        BACKUP[Backup access control]
     end
-    subgraph L4["Camada 4 — Supply Chain"]
+    subgraph L4["Layer 4 — Supply Chain"]
         DEP[Dependency scan]
         IMG[Image scan]
         SBOM[SBOM]
@@ -39,59 +41,59 @@ flowchart TB
 
 ---
 
-## 2. Gestão de secrets
+## 2. Secrets management
 
-| Prática | Detalhe |
+| Practice | Detail |
 |---|---|
-| Sem secrets no git | Garantido por `.gitignore` + secret scanning |
-| Injeção em runtime | Environment / secret store no start do processo |
-| Rotação | Rotação documentada de signing keys e credenciais de DB |
-| Exposição mínima | Workers recebem só os secrets que precisam |
-| Audit | Acesso a secrets de produção é logado |
+| No secrets in git | Enforced by `.gitignore` + secret scanning |
+| Runtime injection | Environment / secret store at process start |
+| Rotation | Documented rotation of signing keys and DB credentials |
+| Minimal exposure | Workers receive only the secrets they need |
+| Audit | Access to production secrets is logged |
 
 > [!CAUTION]
-> Arquivos de exemplo (`env.example`) contêm **somente placeholders**. Nunca copie valores de produção para este repositório.
+> Example files (`env.example`) contain **placeholders only**. Never copy production values into this repository.
 
-**Roadmap:** Secrets Manager centralizado com credenciais de curta duração (veja [ROADMAP.md](../ROADMAP.md)).
+**Roadmap:** Centralized Secrets Manager with short-lived credentials (see [ROADMAP.md](../ROADMAP.md)).
 
 ---
 
-## 3. Variáveis de ambiente
+## 3. Environment variables
 
-- Separadas por ambiente (`development`, `staging`, `production`)
-- Validação tipada no boot — o processo recusa subir se faltar chave obrigatória
-- Distinção entre config **pública** (feature flags) e config **secreta** (credenciais)
+- Separated by environment (`development`, `staging`, `production`)
+- Typed validation at boot — the process refuses to start if a required key is missing
+- Distinction between **public** config (feature flags) and **secret** config (credentials)
 
 ---
 
 ## 4. JWT
 
-| Tópico | Abordagem |
+| Topic | Approach |
 |---|---|
-| Emissão | Identity provider (Supabase Auth) |
-| Validação | Assinatura, `exp`, checks de `aud` / issuer na API |
-| Storage (browser) | Cookies HttpOnly secure preferidos a `localStorage` quando viável |
-| Rotação | Rotação de signing key suportada pelo provedor |
-| Revogação | TTL curto + refresh; invalidação de sessão server-side quando necessário |
+| Issuance | Identity provider (Supabase Auth) |
+| Validation | Signature, `exp`, `aud` / issuer checks at the API |
+| Storage (browser) | Secure HttpOnly cookies preferred over `localStorage` when viable |
+| Rotation | Signing-key rotation supported by the provider |
+| Revocation | Short TTL + refresh; server-side session invalidation when needed |
 
 ---
 
 ## 5. Authentication
 
-- IdP centralizado — a aplicação não guarda password hashes quando o auth é gerenciado pelo provedor
-- MFA disponível na camada do IdP para tenants privilegiados (depende da política)
-- Mitigações de session fixation e CSRF em fluxos baseados em cookie
+- Centralized IdP — the application does not store password hashes when auth is provider-managed
+- MFA available at the IdP layer for privileged tenants (policy-dependent)
+- Session-fixation and CSRF mitigations on cookie-based flows
 
 ---
 
 ## 6. Authorization
 
-| Modelo | Uso |
+| Model | Use |
 |---|---|
-| Role-based (RBAC) | Permissões grosseiras (admin, member, viewer) |
-| Isolamento de tenant | Claim de tenant obrigatória em toda request |
-| Checks de recurso | Checks no nível do objeto na camada de domínio |
-| Defense in depth | RLS garante tenancy mesmo se houver bug na app |
+| Role-based (RBAC) | Coarse permissions (admin, member, viewer) |
+| Tenant isolation | Mandatory tenant claim on every request |
+| Resource checks | Object-level checks in the domain layer |
+| Defense in depth | RLS enforces tenancy even if the app has a bug |
 
 ```mermaid
 sequenceDiagram
@@ -113,24 +115,24 @@ sequenceDiagram
 
 ## 7. Row Level Security (RLS)
 
-- Habilitado em tabelas pertencentes ao tenant
-- Policies vinculadas a JWT claims / variáveis de sessão do DB
-- Service role reservado a workers confiáveis, com uso auditado
-- Código da aplicação nunca “desliga RLS” em caminhos voltados ao usuário
+- Enabled on tenant-owned tables
+- Policies bound to JWT claims / DB session variables
+- Service role reserved for trusted workers, with audited use
+- Application code never “turns off RLS” on user-facing paths
 
 ---
 
-## 8. Isolamento de containers
+## 8. Container isolation
 
-- Usuário não-root
-- Root filesystem read-only quando prático
-- Linux capabilities dropadas
-- Sem Docker socket montado em containers da app
-- Resource limits (CPU / memória) para conter noisy neighbors
+- Non-root user
+- Read-only root filesystem when practical
+- Dropped Linux capabilities
+- No Docker socket mounted into app containers
+- Resource limits (CPU / memory) to contain noisy neighbors
 
 ---
 
-## 9. Isolamento de rede
+## 9. Network isolation
 
 ```mermaid
 flowchart LR
@@ -140,178 +142,178 @@ flowchart LR
     API --> REDIS[(Redis — internal only)]
     W[Workers] --> REDIS
     W --> DB
-    Note1[Sem bind público em Redis ou DB]
+    Note1[No public bind on Redis or DB]
 ```
 
-- Redis e portas internas de admin **não** publicadas na internet
-- Egress dos workers controlado para fetch de fontes
-- Frontend fala só com o hostname público da API sobre TLS
+- Redis and internal admin ports are **not** published to the internet
+- Worker egress controlled for source fetching
+- Frontend talks only to the public API hostname over TLS
 
 ---
 
 ## 10. Least privilege
 
-| Ator | Privilégio |
+| Actor | Privilege |
 |---|---|
-| Usuário anônimo | Só rotas públicas de marketing |
-| Usuário autenticado | Dados do próprio tenant |
-| Admin do tenant | Gestão de usuários do tenant |
-| Service role do worker | Tabelas / operações estreitas exigidas pelos jobs |
-| Role de deploy do CI | Push de imagens + deploy — sem admin de DB |
+| Anonymous user | Public marketing routes only |
+| Authenticated user | Own-tenant data |
+| Tenant admin | Tenant user management |
+| Worker service role | Narrow tables / operations required by jobs |
+| CI deploy role | Image push + deploy — no DB admin |
 
 ---
 
-## 11. OWASP Top 10 — mapeamento
+## 11. OWASP Top 10 — mapping
 
-| Risco | Mitigação |
+| Risk | Mitigation |
 |---|---|
-| Broken Access Control | RBAC + RLS + testes |
-| Cryptographic Failures | TLS em tudo; secrets gerenciados; sem crypto caseira |
-| Injection | Queries parametrizadas; validação estrita |
+| Broken Access Control | RBAC + RLS + tests |
+| Cryptographic Failures | TLS everywhere; managed secrets; no home-grown crypto |
+| Injection | Parameterized queries; strict validation |
 | Insecure Design | Threat model + ADRs |
-| Security Misconfiguration | Imagens endurecidas; secure headers; baselines orientadas a CIS |
-| Vulnerable Components | Scan de dependência + imagem no CI |
-| Auth Failures | Boas práticas do IdP; MFA para ops privilegiadas |
-| Software & Data Integrity | Deps assinadas/travadas; artefatos imutáveis |
-| Logging Failures | Logs estruturados relevantes à segurança (sem secrets) |
-| SSRF | Allowlists de egress; bloquear IPs link-local / de metadata |
+| Security Misconfiguration | Hardened images; secure headers; CIS-oriented baselines |
+| Vulnerable Components | Dependency + image scan in CI |
+| Auth Failures | IdP best practices; MFA for privileged ops |
+| Software & Data Integrity | Locked/signed deps; immutable artifacts |
+| Logging Failures | Security-relevant structured logs (no secrets) |
+| SSRF | Egress allowlists; block link-local / metadata IPs |
 
 ---
 
 ## 12. Dependency scanning
 
-- Lockfiles commitados
-- CI falha no limiar de severidade
-- Updates estilo Dependabot / Renovate (depende do processo)
-- Revisar licenses para compliance
+- Lockfiles committed
+- CI fails at the severity threshold
+- Dependabot / Renovate-style updates (process-dependent)
+- Review licenses for compliance
 
 ---
 
 ## 13. Image scanning
 
-- Scan de toda imagem antes da promoção
-- Updates de imagem base em cadência
-- Sem `latest` em deploys de produção
+- Scan every image before promotion
+- Base-image updates on a cadence
+- No `latest` in production deploys
 
 ---
 
-## 14. Segurança da supply chain
+## 14. Supply chain security
 
-| Controle | Status |
+| Control | Status |
 |---|---|
-| Dependências travadas | Obrigatório |
-| CI em runners confiáveis | Obrigatório |
-| Build context mínimo | Obrigatório |
-| Geração de SBOM | Artefato do pipeline |
+| Locked dependencies | Required |
+| CI on trusted runners | Required |
+| Minimal build context | Required |
+| SBOM generation | Pipeline artifact |
 | Provenance / attestations | Roadmap |
 
 ---
 
 ## 15. SBOM
 
-- Gerado por build (CycloneDX ou SPDX)
-- Retido com o artefato de release
-- Usado para análise rápida de impacto quando cai um CVE
+- Generated per build (CycloneDX or SPDX)
+- Retained with the release artifact
+- Used for fast impact analysis when a CVE lands
 
 ---
 
-## 16. Proteção contra prompt injection
+## 16. Prompt-injection protection
 
-Onde existirem (ou forem planeados) recursos assistidos por LLM:
+Where LLM-assisted features exist (or are planned):
 
-- Tratar output do modelo como **não confiável**
-- Separar system instructions de conteúdo do usuário/recuperado
-- Sem invocação de tools a partir do output do modelo sem actions allowlisted
-- Sanitizar conteúdo recuperado da web pública antes do prompt
-
----
-
-## 17. Proteção contra SQL injection
-
-- Só ORM / query builder ou parâmetros bound
-- Sem SQL concatenado a partir de input do usuário
-- Item de checklist em code review; regras de SAST
+- Treat model output as **untrusted**
+- Separate system instructions from user/retrieved content
+- No tool invocation from model output without allowlisted actions
+- Sanitize content retrieved from the public web before the prompt
 
 ---
 
-## 18. Proteção contra XSS
+## 17. SQL-injection protection
 
-- Encoding padrão do framework (React / Next.js)
-- `Content-Security-Policy` estrito
-- Evitar `dangerouslySetInnerHTML` a menos que sanitizado e justificado
-
----
-
-## 19. Proteção contra CSRF
-
-- Cookies SameSite
-- CSRF tokens em rotas cookie-auth que mudam estado
-- Preferir padrões de authorization header para clients de API puros
+- ORM / query builder or bound parameters only
+- No SQL concatenated from user input
+- Code-review checklist item; SAST rules
 
 ---
 
-## 20. Validação de input
+## 18. XSS protection
 
-- Validação de schema na fronteira da API (ex.: Zod / equivalentes Pydantic)
-- Rejeitar fields inesperados quando fizer sentido
-- Upload de arquivo: limites de tipo, tamanho e content sniffing
+- Framework default encoding (React / Next.js)
+- Strict `Content-Security-Policy`
+- Avoid `dangerouslySetInnerHTML` unless sanitized and justified
+
+---
+
+## 19. CSRF protection
+
+- SameSite cookies
+- CSRF tokens on cookie-auth state-changing routes
+- Prefer authorization-header patterns for pure API clients
+
+---
+
+## 20. Input validation
+
+- Schema validation at the API boundary (e.g. Zod / Pydantic equivalents)
+- Reject unexpected fields when it makes sense
+- File upload: type, size, and content-sniffing limits
 
 ---
 
 ## 21. Output encoding
 
-- Encoding consciente de contexto para HTML, JSON, URLs
-- Nunca refletir HTML bruto de fontes públicas em contextos privilegiados sem sanitização
+- Context-aware encoding for HTML, JSON, URLs
+- Never reflect raw HTML from public sources into privileged contexts without sanitization
 
 ---
 
 ## 22. Secure headers
 
-| Header | Propósito |
+| Header | Purpose |
 |---|---|
-| `Strict-Transport-Security` | Forçar HTTPS |
-| `Content-Security-Policy` | Reduzir raio de XSS |
+| `Strict-Transport-Security` | Force HTTPS |
+| `Content-Security-Policy` | Reduce XSS blast radius |
 | `X-Content-Type-Options` | nosniff |
-| `Referrer-Policy` | Limitar vazamento |
-| `Permissions-Policy` | Desligar features de browser não usadas |
+| `Referrer-Policy` | Limit leakage |
+| `Permissions-Policy` | Disable unused browser features |
 | `Frame-Ancestors` / `X-Frame-Options` | Clickjacking |
 
-Veja [`nginx.example.conf`](../config-templates/nginx.example.conf).
+See [`nginx.example.conf`](../config-templates/nginx.example.conf).
 
 ---
 
-## 23. Considerações de LGPD
+## 23. LGPD considerations
 
-| Princípio | Aplicação |
+| Principle | Application |
 |---|---|
-| Limitação de finalidade | Coletar só o necessário para o serviço |
-| Minimização | Preferir dados públicos de compras; limitar PII |
-| Acesso e exclusão | Fluxos de admin do tenant + runbooks de suporte |
-| Segurança | Encryption, access control, logging |
-| Notificação de incidente | Playbook de resposta a incidente com revisão jurídica |
-| Processadores | DPA com subprocessadores (hosting, e-mail, auth) |
+| Purpose limitation | Collect only what the service needs |
+| Minimization | Prefer public procurement data; limit PII |
+| Access and erasure | Tenant-admin flows + support runbooks |
+| Security | Encryption, access control, logging |
+| Incident notification | Incident-response playbook with legal review |
+| Processors | DPA with subprocessors (hosting, email, auth) |
 
 > [!NOTE]
-> Esta seção é orientação arquitetural — não é aconselhamento jurídico. DPIAs formais e revisão por assessoria jurídica são necessários para claims de compliance em produção.
+> This section is architectural guidance — not legal advice. Formal DPIAs and counsel review are required for production compliance claims.
 
 ---
 
 ## 24. Defense in depth
 
-Nenhum controle sozinho é confiável. Exemplo: mesmo com autorização perfeita na API, RLS continua obrigatório; mesmo com RLS, isolamento de rede ainda se aplica.
+No single control is trusted alone. Example: even with perfect API authorization, RLS remains mandatory; even with RLS, network isolation still applies.
 
 ---
 
 ## 25. Zero trust
 
-- Autenticar toda request
-- Autorizar todo acesso a recurso
+- Authenticate every request
+- Authorize every resource access
 - Encrypt in transit
-- Assumir breach: limitar movimento lateral via segmentação e least privilege
+- Assume breach: limit lateral movement via segmentation and least privilege
 
 ---
 
-## Documentos relacionados
+## Related documents
 
 - [THREAT_MODEL.md](THREAT_MODEL.md)
 - [DEVOPS_AND_CICD.md](DEVOPS_AND_CICD.md)

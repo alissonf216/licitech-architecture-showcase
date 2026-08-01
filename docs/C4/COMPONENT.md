@@ -1,16 +1,18 @@
 # C4 — Components
 
-> **Nível 3.** Blocos principais dentro da API e dos Workers. Conceitual — não é dump da árvore de código.
+> **Language:** English · [Português (Brasil)](../pt-br/C4/COMPONENT.md)
+
+> **Level 3.** Main blocks inside the API and Workers. Conceptual — not a dump of the source tree.
 
 ---
 
-## Para que serve
+## Purpose
 
-Explicar a **separação de responsabilidades** por dentro, sem nomes de módulos proprietários nem algoritmos de negócio.
+Explain the **separation of responsibilities** internally, without proprietary module names or business algorithms.
 
 ---
 
-## Componentes da API
+## API components
 
 ```mermaid
 flowchart TB
@@ -35,19 +37,19 @@ flowchart TB
     MW --> AUTH[Auth Provider]
 ```
 
-| Componente | Responsabilidade |
+| Component | Responsibility |
 |---|---|
-| HTTP Interface | Roteamento, status codes, serialização |
-| Auth Middleware | Validação de JWT, extração do principal |
-| Validation | Checagem de schema; rejeitar input malformado cedo |
-| Application Services | Orquestração de use cases |
-| Repositories | Abstração de persistência |
-| Queue Publisher | Enfileirar jobs com idempotency keys |
-| Observability Hooks | Correlation IDs, métricas RED |
+| HTTP Interface | Routing, status codes, serialization |
+| Auth Middleware | JWT validation, principal extraction |
+| Validation | Schema checks; reject malformed input early |
+| Application Services | Use-case orchestration |
+| Repositories | Persistence abstraction |
+| Queue Publisher | Enqueue jobs with idempotency keys |
+| Observability Hooks | Correlation IDs, RED metrics |
 
 ---
 
-## Componentes dos Workers
+## Worker components
 
 ```mermaid
 flowchart TB
@@ -71,18 +73,18 @@ flowchart TB
     CONS --> REDIS[(Redis)]
 ```
 
-| Componente | Responsabilidade |
+| Component | Responsibility |
 |---|---|
-| Queue Consumer | Fazer lease de jobs; heartbeat; ACK/NACK |
-| Job Dispatcher | Roteamento por tipo de job |
-| Handlers | Use cases quase puros para cada família de job |
-| Idempotency Guard | Pular side effects duplicados |
-| Retry / DLQ Policy | Backoff; dead-letter; alerta |
-| Repositories | Mesma fronteira de persistência da API |
+| Queue Consumer | Lease jobs; heartbeat; ACK/NACK |
+| Job Dispatcher | Routing by job type |
+| Handlers | Near-pure use cases for each job family |
+| Idempotency Guard | Skip duplicate side effects |
+| Retry / DLQ Policy | Backoff; dead-letter; alert |
+| Repositories | Same persistence boundary as the API |
 
 ---
 
-## Componentes do frontend (simplificado)
+## Frontend components (simplified)
 
 ```mermaid
 flowchart LR
@@ -101,17 +103,17 @@ flowchart LR
 
 ---
 
-## Regras de design entre componentes
+## Cross-component design rules
 
-1. **Sem SQL em HTTP handlers** — só repositories
-2. **Sem HTTP em workers** para writes de domínio core — handlers chamam repositories/services
-3. **Idempotency** é obrigatória em todo job handler
-4. **Checagens de AuthZ** acontecem nos services *e* no RLS
-5. **Secrets** nunca passam em payloads de job quando dá para evitar — buscar em runtime
+1. **No SQL in HTTP handlers** — repositories only
+2. **No HTTP in workers** for core domain writes — handlers call repositories/services
+3. **Idempotency** is mandatory on every job handler
+4. **AuthZ checks** happen in services *and* in RLS
+5. **Secrets** never travel in job payloads when avoidable — fetch at runtime
 
 ---
 
-## Relacionados
+## Related
 
 - [CONTAINER.md](CONTAINER.md)
 - [ARCHITECTURE.md](../ARCHITECTURE.md)

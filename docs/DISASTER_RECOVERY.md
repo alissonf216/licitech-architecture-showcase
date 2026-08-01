@@ -1,18 +1,18 @@
 # Disaster Recovery
 
-> Como a Licitera sobrevive a perda de dados, problema regional e release ruim — com alvos explícitos de RPO/RTO.
+> How Licitech survives data loss, regional impairment, and a bad release — with explicit RPO/RTO targets.
 
 ---
 
-## 1. Objetivos
+## 1. Objectives
 
-| Métrica | Alvo (design atual) | Significado |
+| Metric | Target (current design) | Meaning |
 |---|---|---|
-| **RPO** | ≤ 24 horas (stretch ≤ 1 hora com PITR) | Máxima perda de dados aceitável |
-| **RTO** | ≤ 8 horas (stretch ≤ 4 horas) | Máximo downtime aceitável |
+| **RPO** | ≤ 24 hours (stretch ≤ 1 hour with PITR) | Maximum acceptable data loss |
+| **RTO** | ≤ 8 hours (stretch ≤ 4 hours) | Maximum acceptable downtime |
 
 > [!IMPORTANT]
-> Os alvos são compromissos de arquitetura. Números reais dependem de SLAs do provedor, configuração de backup e frequência de ensaio dos runbooks.
+> Targets are architecture commitments. Real numbers depend on provider SLAs, backup configuration, and how often runbooks are rehearsed.
 
 ```mermaid
 flowchart LR
@@ -29,25 +29,25 @@ flowchart LR
 
 ---
 
-## 2. Estratégia de backup
+## 2. Backup strategy
 
-| Ativo | Método | Frequência | Retenção |
+| Asset | Method | Frequency | Retention |
 |---|---|---|---|
-| PostgreSQL | Backups automáticos gerenciados + PITR | WAL contínuo / snapshots diários | Por política do provedor (ex.: 7–30 dias) |
-| Object storage | Versioning / cross-backup | Contínuo | Baseado em política |
-| Secrets | Backup out-of-band em store seguro | Na mudança | Acesso com dual-control |
-| Imagens de container | Retenção no registry de SHAs known-good | A cada release | Últimos N SHAs de produção |
-| Config de infra | Templates versionados / IaC (roadmap) | Na mudança | Histórico do Git |
+| PostgreSQL | Managed automatic backups + PITR | Continuous WAL / daily snapshots | Per provider policy (e.g. 7–30 days) |
+| Object storage | Versioning / cross-backup | Continuous | Policy-based |
+| Secrets | Out-of-band backup in a secure store | On change | Dual-control access |
+| Container images | Registry retention of known-good SHAs | Every release | Last N production SHAs |
+| Infra config | Versioned templates / IaC (roadmap) | On change | Git history |
 
-**Regras**
+**Rules**
 
-- Backups são encrypted at rest
-- Acesso à capacidade de restore é break-glass / dual control
-- Backups de produção nunca são restaurados em ambientes compartilhados de desenvolvimento sem anonimização
+- Backups are encrypted at rest
+- Access to restore capability is break-glass / dual control
+- Production backups are never restored into shared development environments without anonymization
 
 ---
 
-## 3. Processo de restore
+## 3. Restore process
 
 ```mermaid
 sequenceDiagram
@@ -68,70 +68,70 @@ sequenceDiagram
     Ops->>Tick: Timeline + postmortem
 ```
 
-**Checklist (resumido)**
+**Checklist (summary)**
 
-1. Congelar writes / ativar banner de manutenção
-2. Identificar o último timestamp known-good
-3. Restaurar primeiro em instância isolada quando a causa da corrupção não estiver clara
-4. Validar contagens de rows / checksums / smoke tests da app
-5. Repontar a aplicação; revogar o endpoint antigo
-6. Monitorar error budgets de perto por 24h
+1. Freeze writes / enable maintenance banner
+2. Identify the last known-good timestamp
+3. Restore first on an isolated instance when the corruption cause is unclear
+4. Validate row counts / checksums / app smoke tests
+5. Repoint the application; revoke the old endpoint
+6. Monitor error budgets closely for 24h
 
 ---
 
 ## 4. Snapshots
 
-- Prefira snapshots nativos do provedor para Postgres e discos
-- Snapshot antes de migrations de alto risco
-- Tag snapshots com IDs de tickets de mudança
-- Teste restore trimestralmente (mínimo)
+- Prefer provider-native snapshots for Postgres and disks
+- Snapshot before high-risk migrations
+- Tag snapshots with change-ticket IDs
+- Test restore quarterly (minimum)
 
 ---
 
 ## 5. Rollback
 
-| Camada | Mecanismo |
+| Layer | Mechanism |
 |---|---|
-| Imagem da aplicação | Redeploy do `sha-*` anterior |
-| Frontend | Rollback instantâneo da Vercel para o deploy anterior |
-| Feature flags | Desligar o caminho ofensor |
-| Schema | Forward-fix; evitar reverse migrations a menos que ensaiadas |
+| Application image | Redeploy previous `sha-*` |
+| Frontend | Instant Vercel rollback to previous deploy |
+| Feature flags | Turn off the offending path |
+| Schema | Forward-fix; avoid reverse migrations unless rehearsed |
 
-Veja [DEVOPS_AND_CICD.md](DEVOPS_AND_CICD.md).
+See [DEVOPS_AND_CICD.md](DEVOPS_AND_CICD.md).
 
 ---
 
-## 6. Continuidade de negócio
+## 6. Business continuity
 
-| Capacidade | Modo de continuidade |
+| Capability | Continuity mode |
 |---|---|
-| Browse read-only dos últimos dados bons | Possível se o DB for restaurado read-only |
-| Ingestão | Pausar; backlog da queue drena após a recovery |
-| Notificações | Pausar para evitar tempestade de duplicatas; replay com cuidado |
-| Auth | Depende do status regional do IdP — comunicar via status page |
+| Read-only browse of last good data | Possible if DB is restored read-only |
+| Ingestion | Pause; queue backlog drains after recovery |
+| Notifications | Pause to avoid duplicate storms; replay carefully |
+| Auth | Depends on IdP regional status — communicate via status page |
 
-Plano de comunicação: updates de status para tenants nos canais combinados; sem ETAs especulativos.
+Communication plan: status updates to tenants on agreed channels; no speculative ETAs.
 
 ---
 
-## 7. Cenários de disaster recovery
+## 7. Disaster recovery scenarios
 
-| Cenário | Resposta primária |
+| Scenario | Primary response |
 |---|---|
-| Falha de um container | Restart do orquestrador |
-| Falha de host | Redeploy de imagens no host de reposição; restaurar volumes se precisar |
-| Delete em massa acidental | PITR para o timestamp pré-incidente |
-| Ransomware / destruição hostil | Isolar; restore de backups offline/imutáveis |
-| Release ruim | Rollback de imagem + flag off |
-| Outage regional do provedor | Esperar + comunicar; restore em região secundária (longo prazo) |
+| Single container failure | Orchestrator restart |
+| Host failure | Redeploy images on replacement host; restore volumes if needed |
+| Accidental mass delete | PITR to pre-incident timestamp |
+| Ransomware / hostile destruction | Isolate; restore from offline/immutable backups |
+| Bad release | Image rollback + flag off |
+| Provider regional outage | Wait + communicate; restore in secondary region (long term) |
 
 ---
 
-## 8. RPO & RTO — exemplo trabalhado
+## 8. RPO & RTO — worked example
 
 ```mermaid
 gantt
-    title Timeline Ilustrativa de Recovery (Perda de Host)
+    title Illustrative Recovery Timeline (Host Loss)
     dateFormat HH:mm
     axisFormat %H:%M
     section Detection
@@ -144,22 +144,22 @@ gantt
     Confirm DB reachable     :a5, after a1, 45m
 ```
 
-Se o banco gerenciado continuar saudável enquanto o compute se perde, o RTO colapsa para **reprovision + deploy + verify**. Se o próprio banco precisar de restore, RPO/RTO acompanham a frescor do backup e a duração do restore.
+If the managed database stays healthy while compute is lost, RTO collapses to **reprovision + deploy + verify**. If the database itself needs restore, RPO/RTO track backup freshness and restore duration.
 
 ---
 
 ## 9. Drills
 
-| Drill | Cadência |
+| Drill | Cadence |
 |---|---|
-| Rollback de imagem | A cada major release train |
-| Restore de backup em staging | Trimestral |
-| Rotação de secret | Semestral |
-| Tabletop de outage regional | Anual |
+| Image rollback | Every major release train |
+| Backup restore in staging | Quarterly |
+| Secret rotation | Semiannual |
+| Regional-outage tabletop | Annual |
 
 ---
 
-## Documentos relacionados
+## Related documents
 
 - [DEVOPS_AND_CICD.md](DEVOPS_AND_CICD.md)
 - [OBSERVABILITY.md](OBSERVABILITY.md)

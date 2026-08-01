@@ -1,4 +1,6 @@
-# ADR 0002 — Vercel Edge para o Frontend
+# ADR 0002 — Vercel Edge for the Frontend
+
+> **Language:** English · [Português (Brasil)](../pt-br/ADR/0002-vercel-edge.md)
 
 - **Status:** Accepted
 - **Date:** 2025-01-15
@@ -8,67 +10,67 @@
 
 ## Context
 
-A UI da Licitera é uma aplicação Next.js que precisa de:
+Licitech's UI is a Next.js application that needs:
 
-- Baixa latência global para páginas de marketing e shells autenticados do app
-- Preview deployments por pull request
-- Quase zero ops para TLS, CDN e entrega de assets estáticos
+- Low global latency for marketing pages and authenticated app shells
+- Preview deployments per pull request
+- Near-zero ops for TLS, CDN, and static asset delivery
 
-Workloads de ingestão e workers de longa duração não combinam com edge functions efêmeras.
+Ingestion workloads and long-running workers do not fit ephemeral edge functions.
 
 ---
 
 ## Decision
 
-Deployar o **frontend na Edge Network da Vercel**. Manter a **API e os workers em compute Dockerizado** (Dokploy), falando por HTTPS público com requests autenticados via JWT.
+Deploy the **frontend on Vercel's Edge Network**. Keep the **API and workers on Dockerized compute** (Dokploy), talking over public HTTPS with JWT-authenticated requests.
 
 ---
 
 ## Alternatives Considered
 
-| Alternativa | Por que não (agora) |
+| Alternative | Why not (now) |
 |---|---|
-| **Self-host Next.js na mesma VM** | Perde CDN global e DX de preview; mistura domínios de falha |
-| **Cloudflare Pages** | Viável; o time já padronizou no tooling Vercel + Next.js |
-| **Netlify** | Trade-offs parecidos; encaixa pior nos workflows Next.js que já usamos |
-| **Tudo em edge SSR para APIs** | Timeouts / limites de execução batem de frente com trabalho pesado de servidor |
+| **Self-host Next.js on the same VM** | Loses global CDN and preview DX; mixes failure domains |
+| **Cloudflare Pages** | Viable; the team already standardized on Vercel + Next.js tooling |
+| **Netlify** | Similar trade-offs; weaker fit for the Next.js workflows we already use |
+| **Everything as edge SSR for APIs** | Timeouts / execution limits clash with heavy server-side work |
 
 ---
 
 ## Trade-offs
 
-| Benefício | Custo |
+| Benefit | Cost |
 |---|---|
-| CDN e preview de primeira | Pipelines de deploy separados (frontend vs backend) |
-| Quase zero ops de TLS/CDN | Acoplamento de vendor no hosting do frontend |
-| Separação clara dos workers | Design de cross-origin / cookies precisa ser intencional |
-| Escala com a plataforma | Cold-start / limites da plataforma em edge functions se forem mal usadas |
+| First-class CDN and previews | Separate deploy pipelines (frontend vs backend) |
+| Near-zero TLS/CDN ops | Vendor coupling on frontend hosting |
+| Clear separation from workers | Cross-origin / cookie design must be intentional |
+| Scales with the platform | Cold-start / platform limits on edge functions if misused |
 
 ---
 
 ## Consequences
 
-**Positivo**
+**Positive**
 
-- Falha no frontend não derruba workers, e vice-versa
-- Páginas de marketing conseguem bater budgets de performance fortes
-- Backend evolui sozinho (tags de imagem)
+- Frontend failure does not take down workers, and vice versa
+- Marketing pages can hit strong performance budgets
+- Backend evolves independently (image tags)
 
-**Negativo / Follow-ups**
+**Negative / Follow-ups**
 
-- Regra: nada de jobs pesados em route handlers do Next.js
-- Documentar estratégia de CORS / cookie / CSRF entre origins
-- Monitorar limites de uso e orçamento da Vercel
+- Rule: no heavy jobs in Next.js route handlers
+- Document CORS / cookie / CSRF strategy across origins
+- Monitor Vercel usage limits and budget
 
 **Non-goals**
 
-- Mover consumers Redis ou automações de longa duração para a Vercel
-- Guardar secrets só na edge sem validação no backend
+- Moving Redis consumers or long-running automations to Vercel
+- Storing secrets only on the edge without backend validation
 
 ---
 
 ## Related
 
-- [ADR 0001 — Docker em vez de Kubernetes](0001-docker-over-kubernetes.md)
+- [ADR 0001 — Docker over Kubernetes](0001-docker-over-kubernetes.md)
 - [PERFORMANCE.md](../PERFORMANCE.md)
 - [ARCHITECTURE.md](../ARCHITECTURE.md)

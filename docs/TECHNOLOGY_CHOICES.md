@@ -1,25 +1,25 @@
-# Escolhas de tecnologia
+# Technology Choices
 
-> Para cada tecnologia: o contexto, a decisão, as alternativas, o trade-off e o que muda na prática.
+> For each technology: context, decision, alternatives, trade-off, and what changes in practice.
 
 ---
 
-## Matriz-resumo
+## Summary matrix
 
-| Tecnologia | Papel | Motivo principal |
+| Technology | Role | Primary reason |
 |---|---|---|
-| Next.js | Framework frontend | SSR/SSG + ecossistema React na Vercel |
-| TypeScript | Frontend (/ tipos compartilhados) | Type safety na UI e nos contratos de API |
-| Python | Backend & workers | Serviços IO-bound rápidos; libs ricas de dados |
-| Docker | Packaging | Runtime consistente entre ambientes |
-| Dokploy | Orquestração de deploy | PaaS Docker low-ops em compute próprio |
-| GitHub Actions | CI/CD | Integração nativa com o SCM |
-| Supabase | Auth + Postgres gerenciado + storage | Velocidade com primitives de RLS |
-| PostgreSQL | System of record | Integridade relacional + RLS |
-| Redis | Queue / cache | Broker simples e rápido |
-| Nginx | Reverse proxy / TLS | Edge no host, já batido em produção |
-| Vercel | Hosting do frontend | Edge global + preview deploys |
-| Mermaid | Diagramas de arquitetura | Baseado em texto, revisável no Git |
+| Next.js | Frontend framework | SSR/SSG + React ecosystem on Vercel |
+| TypeScript | Frontend (/ shared types) | Type safety in UI and API contracts |
+| Python | Backend & workers | Fast IO-bound services; rich data libs |
+| Docker | Packaging | Consistent runtime across environments |
+| Dokploy | Deploy orchestration | Low-ops Docker PaaS on own compute |
+| GitHub Actions | CI/CD | Native SCM integration |
+| Supabase | Auth + managed Postgres + storage | Speed with RLS primitives |
+| PostgreSQL | System of record | Relational integrity + RLS |
+| Redis | Queue / cache | Simple, fast broker |
+| Nginx | Reverse proxy / TLS | Host-edge, battle-tested in production |
+| Vercel | Frontend hosting | Global edge + preview deploys |
+| Mermaid | Architecture diagrams | Text-based, reviewable in Git |
 
 ---
 
@@ -27,11 +27,11 @@
 
 | | |
 |---|---|
-| **Contexto** | Precisa de UI web moderna com SEO forte para marketing e rotas autenticadas da app |
-| **Decisão** | Next.js App Router na Vercel |
-| **Alternativas** | Remix, React SPA puro, SvelteKit |
-| **Trade-offs** | Convenções do framework vs flexibilidade; acoplamento a features da Vercel se exagerar |
-| **Consequências** | Entrega rápida de UI; manter jobs pesados de backend fora das server routes do Next.js |
+| **Context** | Need a modern web UI with strong SEO for marketing and authenticated app routes |
+| **Decision** | Next.js App Router on Vercel |
+| **Alternatives** | Remix, pure React SPA, SvelteKit |
+| **Trade-offs** | Framework conventions vs flexibility; coupling to Vercel features if overused |
+| **Consequences** | Fast UI delivery; keep heavy backend jobs out of Next.js server routes |
 
 ---
 
@@ -39,11 +39,11 @@
 
 | | |
 |---|---|
-| **Contexto** | Complexidade de UI e risco de drift nos contratos de API |
-| **Decisão** | TypeScript no frontend (e tipos DTO compartilhados quando aplicável) |
-| **Alternativas** | JavaScript, Flow |
-| **Trade-offs** | Um pouco mais verboso; passo de build |
-| **Consequências** | Menos bugs de contrato em runtime na UI; mais confiança em refactors |
+| **Context** | UI complexity and risk of API contract drift |
+| **Decision** | TypeScript on the frontend (and shared DTO types when applicable) |
+| **Alternatives** | JavaScript, Flow |
+| **Trade-offs** | Slightly more verbose; build step |
+| **Consequences** | Fewer runtime contract bugs in the UI; more confidence in refactors |
 
 ---
 
@@ -51,11 +51,11 @@
 
 | | |
 |---|---|
-| **Contexto** | Ingestão IO-bound, parsing, workers de orquestração |
-| **Decisão** | Python para API/workers |
-| **Alternativas** | Node.js em tudo, Go, Java |
-| **Trade-offs** | GIL para CPU-bound; disciplina de packaging necessária |
-| **Consequências** | Iteração rápida; workers escalam via processos/containers |
+| **Context** | IO-bound ingestion, parsing, orchestration workers |
+| **Decision** | Python for API/workers |
+| **Alternatives** | Node.js everywhere, Go, Java |
+| **Trade-offs** | GIL for CPU-bound work; packaging discipline required |
+| **Consequences** | Fast iteration; workers scale via processes/containers |
 
 ---
 
@@ -63,11 +63,11 @@
 
 | | |
 |---|---|
-| **Contexto** | Precisa de deploys reproduzíveis sem “funciona na minha máquina” |
-| **Decisão** | Docker como unidade de deploy |
-| **Alternativas** | systemd bare, Nix, unikernels |
-| **Trade-offs** | Manutenção de imagens; dependência de registry |
-| **Consequências** | Paridade entre staging/prod; veja [ADR 0001](ADR/0001-docker-over-kubernetes.md) |
+| **Context** | Need reproducible deploys without “works on my machine” |
+| **Decision** | Docker as the deploy unit |
+| **Alternatives** | Bare systemd, Nix, unikernels |
+| **Trade-offs** | Image maintenance; registry dependency |
+| **Consequences** | Staging/prod parity; see [ADR 0001](ADR/0001-docker-over-kubernetes.md) |
 
 ---
 
@@ -75,11 +75,11 @@
 
 | | |
 |---|---|
-| **Contexto** | Time precisa de deploys estilo PaaS numa VM sem rodar K8s cru |
-| **Decisão** | Dokploy para lifecycle de containers em compute próprio |
-| **Alternativas** | CapRover, Coolify, Compose cru + scripts, ECS |
-| **Trade-offs** | Opiniões da plataforma; o caminho de migração precisa continuar image-centric |
-| **Consequências** | Menos carga de ops; imagens continuam portáveis |
+| **Context** | Team needs PaaS-style deploys on a VM without running raw K8s |
+| **Decision** | Dokploy for container lifecycle on own compute |
+| **Alternatives** | CapRover, Coolify, raw Compose + scripts, ECS |
+| **Trade-offs** | Platform opinions; migration path must stay image-centric |
+| **Consequences** | Lower ops load; images remain portable |
 
 ---
 
@@ -87,11 +87,11 @@
 
 | | |
 |---|---|
-| **Contexto** | CI/CD colocalizado com o GitHub |
-| **Decisão** | GitHub Actions para todos os pipelines |
-| **Alternativas** | GitLab CI, CircleCI, Buildkite |
-| **Trade-offs** | Custo de minutos; risco de supply chain das actions do marketplace (pine versões!) |
-| **Consequências** | Gates unificados de PR; security scans como required checks |
+| **Context** | CI/CD colocated with GitHub |
+| **Decision** | GitHub Actions for all pipelines |
+| **Alternatives** | GitLab CI, CircleCI, Buildkite |
+| **Trade-offs** | Minutes cost; marketplace action supply-chain risk (pin versions!) |
+| **Consequences** | Unified PR gates; security scans as required checks |
 
 ---
 
@@ -99,11 +99,11 @@
 
 | | |
 |---|---|
-| **Contexto** | Precisa de Postgres gerenciado, auth e storage rápido com tenancy |
-| **Decisão** | Supabase como data/auth plane |
-| **Alternativas** | Postgres self-managed + Keycloak, Firebase, PlanetScale + auth custom |
-| **Trade-offs** | Acoplamento de vendor; abstrair via repositórios |
-| **Consequências** | Multi-tenancy com RLS first; veja [ADR 0003](ADR/0003-supabase-selection.md) |
+| **Context** | Need managed Postgres, auth, and storage quickly with tenancy |
+| **Decision** | Supabase as data/auth plane |
+| **Alternatives** | Self-managed Postgres + Keycloak, Firebase, PlanetScale + custom auth |
+| **Trade-offs** | Vendor coupling; abstract via repositories |
+| **Consequences** | Multi-tenancy with RLS first; see [ADR 0003](ADR/0003-supabase-selection.md) |
 
 ---
 
@@ -111,11 +111,11 @@
 
 | | |
 |---|---|
-| **Contexto** | Dados relacionais com consistência forte e enforcement de políticas |
-| **Decisão** | PostgreSQL como system of record |
-| **Alternativas** | MySQL, MongoDB, DynamoDB |
-| **Trade-offs** | Escala de writes exige design deliberado |
-| **Consequências** | Encaixa bem com RLS e queries complexas |
+| **Context** | Relational data with strong consistency and policy enforcement |
+| **Decision** | PostgreSQL as system of record |
+| **Alternatives** | MySQL, MongoDB, DynamoDB |
+| **Trade-offs** | Write scale requires deliberate design |
+| **Consequences** | Fits well with RLS and complex queries |
 
 ---
 
@@ -123,11 +123,11 @@
 
 | | |
 |---|---|
-| **Contexto** | Precisa de queue leve e cache efêmero |
-| **Decisão** | Redis para queues / estado de curta duração |
-| **Alternativas** | RabbitMQ, SQS, NATS, Kafka |
-| **Trade-offs** | Semântica de durabilidade precisa ser configurada de propósito |
-| **Consequências** | Ops simples; revisitar Kafka se o volume de eventos explodir |
+| **Context** | Need a light queue and ephemeral cache |
+| **Decision** | Redis for queues / short-lived state |
+| **Alternatives** | RabbitMQ, SQS, NATS, Kafka |
+| **Trade-offs** | Durability semantics must be configured on purpose |
+| **Consequences** | Simple ops; revisit Kafka if event volume explodes |
 
 ---
 
@@ -135,11 +135,11 @@
 
 | | |
 |---|---|
-| **Contexto** | Terminação TLS e reverse proxy no host de compute |
-| **Decisão** | Nginx na frente dos containers da API |
-| **Alternativas** | Caddy, Traefik, só cloud LB |
-| **Trade-offs** | Disciplina de config as code necessária |
-| **Consequências** | Padrões maduros de hardening; veja o template de config |
+| **Context** | TLS termination and reverse proxy on the compute host |
+| **Decision** | Nginx in front of API containers |
+| **Alternatives** | Caddy, Traefik, cloud LB only |
+| **Trade-offs** | Config-as-code discipline required |
+| **Consequences** | Mature hardening patterns; see the config template |
 
 ---
 
@@ -147,11 +147,11 @@
 
 | | |
 |---|---|
-| **Contexto** | Entrega global de frontend com baixa latência |
-| **Decisão** | Vercel para Next.js |
-| **Alternativas** | Cloudflare Pages, Netlify, Next self-host |
-| **Trade-offs** | Trabalho de backend de longa duração precisa ficar fora do edge |
-| **Consequências** | Preview deploys; veja [ADR 0002](ADR/0002-vercel-edge.md) |
+| **Context** | Global frontend delivery with low latency |
+| **Decision** | Vercel for Next.js |
+| **Alternatives** | Cloudflare Pages, Netlify, self-hosted Next |
+| **Trade-offs** | Long-running backend work must stay off the edge |
+| **Consequences** | Preview deploys; see [ADR 0002](ADR/0002-vercel-edge.md) |
 
 ---
 
@@ -159,11 +159,11 @@
 
 | | |
 |---|---|
-| **Contexto** | Docs de arquitetura precisam ser revisáveis em PRs |
-| **Decisão** | Diagramas Mermaid em Markdown |
-| **Alternativas** | Lucidchart, binários draw.io, PlantUML |
-| **Trade-offs** | Diagramas complexos podem ficar verbosos |
-| **Consequências** | Diagramas com diff; render nativo no GitHub |
+| **Context** | Architecture docs need to be reviewable in PRs |
+| **Decision** | Mermaid diagrams in Markdown |
+| **Alternatives** | Lucidchart, draw.io binaries, PlantUML |
+| **Trade-offs** | Complex diagrams can get verbose |
+| **Consequences** | Diffable diagrams; native GitHub rendering |
 
 ---
 
@@ -190,7 +190,7 @@ mindmap
 
 ---
 
-## Documentos relacionados
+## Related documents
 
 - [ADR/](ADR/)
 - [ARCHITECTURE.md](ARCHITECTURE.md)
